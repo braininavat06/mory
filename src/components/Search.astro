@@ -1,0 +1,5 @@
+---
+import { renderSearch } from '../lib/html.ts';
+import { readContent, publishedPosts } from '../lib/content.ts';
+---
+<Fragment set:html={renderSearch(publishedPosts(readContent()).length > 0)} />

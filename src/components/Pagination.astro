@@ -1,0 +1,11 @@
+---
+import { listUrl } from '../lib/listing.ts';
+import type { Listing } from '../lib/listing.ts';
+interface Props { listing: Listing }
+const { listing: l } = Astro.props;
+---
+{l.totalPages > 1 && <nav class="pagination" aria-label="페이지 이동">
+  {l.page > 1 ? <a rel="prev" href={listUrl(l.base, l.sort, l.page - 1)}>← 이전</a> : <span></span>}
+  <span aria-current="page">{l.page} / {l.totalPages}</span>
+  {l.page < l.totalPages ? <a rel="next" href={listUrl(l.base, l.sort, l.page + 1)}>다음 →</a> : <span></span>}
+</nav>}

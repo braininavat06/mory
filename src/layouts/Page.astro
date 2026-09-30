@@ -1,0 +1,6 @@
+---
+import Base from './Base.astro';
+interface Props { title: string; description: string; home?: boolean }
+const { title, description, home = false } = Astro.props;
+---
+<Base title={title} description={description}><article class:list={['page-content', 'prose', { 'home-content': home }]}><slot /></article></Base>

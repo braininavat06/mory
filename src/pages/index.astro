@@ -1,0 +1,8 @@
+---
+import { getEntry, render } from 'astro:content';
+import Page from '../layouts/Page.astro';
+const page = await getEntry('pages', 'home');
+if (!page) throw new Error('src/content/pages/home.md가 없습니다.');
+const { Content } = await render(page);
+---
+<Page title={page.data.title} description={page.data.description} home><Content /></Page>

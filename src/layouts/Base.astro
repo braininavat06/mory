@@ -1,0 +1,62 @@
+---
+import Search from '../components/Search.astro';
+import { SITE, SITE_NAME, SITE_DESCRIPTION } from '../lib/config.ts';
+import '../styles/global.css';
+interface Props { title?: string; description?: string; canonical?: string; noindex?: boolean; redirect?: string; type?: 'website' | 'article'; publishedAt?: string; updatedAt?: string }
+const { title = SITE_NAME, description = SITE_DESCRIPTION, canonical = Astro.url.pathname, noindex = false, redirect, type = 'website', publishedAt, updatedAt } = Astro.props;
+const documentTitle = title === SITE_NAME ? title : `${title} · ${SITE_NAME}`;
+const canonicalUrl = new URL(canonical, SITE).href;
+const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.pathname);
+---
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script is:inline>
+    (() => {
+      let preference = 'system';
+      try { const saved = localStorage.getItem('mory-theme'); if (['system', 'light', 'dark'].includes(saved)) preference = saved; } catch {}
+      document.documentElement.dataset.themePreference = preference;
+      document.documentElement.dataset.theme = preference === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : preference;
+    })();
+  </script>
+  <title>{documentTitle}</title>
+  <meta name="description" content={description} data-pagefind-meta="description[content]" />
+  <link rel="canonical" href={canonicalUrl} />
+  <meta property="og:site_name" content={SITE_NAME} />
+  <meta property="og:title" content={documentTitle} />
+  <meta property="og:description" content={description} />
+  <meta property="og:type" content={type} />
+  <meta property="og:url" content={canonicalUrl} />
+  <meta property="og:locale" content="ko_KR" />
+  {publishedAt && <meta property="article:published_time" content={publishedAt} />}
+  {updatedAt && <meta property="article:modified_time" content={updatedAt} />}
+  {noindex && <meta name="robots" content="noindex,follow" />}
+  {redirect && <meta http-equiv="refresh" content={`0;url=${redirect}`} />}
+  <link rel="alternate" type="application/rss+xml" title="Mory Writing" href="/rss.xml" />
+  <slot name="head" />
+</head>
+<body>
+  <a class="skip-link" href="#main">본문으로 이동</a>
+  <header class="site-header" data-pagefind-ignore>
+    <a class="wordmark" href="/" aria-label="Mory 홈">Mory<span aria-hidden="true">.</span></a>
+    <nav aria-label="주 메뉴">
+      <a href="/writing/" aria-current={writingActive ? 'page' : undefined}>Writing</a>
+      <a href="/about/" aria-current={Astro.url.pathname === '/about/' ? 'page' : undefined}>About</a>
+      <button type="button" data-open-search aria-haspopup="dialog">Search</button>
+    </nav>
+    <label class="theme-control"><span class="visually-hidden">테마</span><select name="theme" aria-label="테마 선택" data-theme-select><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+  </header>
+  <main id="main" tabindex="-1"><slot /></main>
+  <footer class="site-footer" data-pagefind-ignore><span>Mory — 개인 홈페이지와 글 아카이브</span><a href="/rss.xml">RSS</a></footer>
+  <dialog class="search-dialog" aria-labelledby="search-dialog-title" data-search-dialog data-pagefind-ignore>
+    <div class="dialog-header"><h2 id="search-dialog-title">Search Writing</h2><button type="button" data-close-search aria-label="검색 닫기">닫기 ×</button></div>
+    <Search />
+  </dialog>
+  <script>
+    import '../scripts/client.ts';
+    import '../scripts/search.ts';
+  </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+---
+interface Props { headings: { depth: number; slug: string; text: string }[] }
+const headings = Astro.props.headings.filter(h => (h.depth === 2 || h.depth === 3) && h.slug !== 'footnote-label');
+---
+{headings.length > 0 && <aside class="toc" aria-label="목차">
+  <details data-toc><summary>목차 <span aria-hidden="true">↕</span></summary>
+    <nav aria-label="글 목차"><ol>{headings.map(h => <li class:list={{ 'toc-subheading': h.depth === 3 }}><a href={`#${h.slug}`}>{h.text}</a></li>)}</ol></nav>
+  </details>
+  <script is:inline>
+    // Set the initial mobile state during parsing, before the deferred bundle.
+    (() => {
+      const details = document.currentScript?.previousElementSibling;
+      if (details instanceof HTMLDetailsElement) details.open = matchMedia('(min-width: 1000px)').matches;
+    })();
+  </script>
+</aside>}
+<script>
+  import '../scripts/toc.ts';
+</script>

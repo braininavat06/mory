@@ -1,0 +1,4 @@
+# 실제 category 목록이 정해지기 전의 검증용 항목 하나입니다.
+sample:
+  name: "샘플"
+  order: 10

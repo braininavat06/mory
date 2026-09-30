@@ -1,0 +1,12 @@
+---
+import { readContent, publicSeries } from '../../lib/content.ts';
+import type { Post } from '../../lib/content.ts';
+import { renderWritingItems } from '../../lib/html.ts';
+import Base from '../../layouts/Base.astro';
+export function getStaticPaths() {
+  return publicSeries(readContent()).map(series => ({ params: { id: series.id }, props: { series } }));
+}
+interface Props { series: { id: string; name: string; posts: Post[] } }
+const { series } = Astro.props;
+---
+<Base title={series.name} description={`${series.name} 시리즈의 공개 글 ${series.posts.length}편.`}><section class="listing-content"><header class="page-heading"><p class="eyebrow">시리즈</p><h1>{series.name}</h1><p>{series.posts.length}편 · 시리즈 순서</p></header><Fragment set:html={renderWritingItems(series.posts, readContent())} /></section></Base>

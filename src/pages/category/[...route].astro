@@ -1,0 +1,12 @@
+---
+import { readContent, publishedPosts } from '../../lib/content.ts';
+import { listPages, listUrl } from '../../lib/listing.ts';
+import type { Listing } from '../../lib/listing.ts';
+import ListingLayout from '../../layouts/Listing.astro';
+export function getStaticPaths() {
+  const content = readContent();
+  return Object.entries(content.categories).flatMap(([id, category]) => listPages(publishedPosts(content).filter(p => p.data.category === id), `/category/${id}/`).map(listing => ({ params: { route: listUrl(listing.base, listing.sort, listing.page).slice('/category/'.length).replace(/\/$/, '') }, props: { listing, title: category.name, categoryId: id } })));
+}
+interface Props { listing: Listing; title: string; categoryId: string }
+---
+<ListingLayout {...Astro.props} />
