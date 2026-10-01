@@ -17,3 +17,18 @@ export interface PublishJob {
 export class CmsError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
+
+/** Both workspace and public references must be moved before deleting a category. */
+export function categoryReferences(drafts: Draft[], id: string) {
+  return drafts.filter(d => d.kind === 'post' && (d.value.data.category === id || d.published?.data.category === id)).map(d => ({
+    key: d.key,
+    title: d.value.data.title || d.published?.data.title || '제목 없는 글',
+    status: d.status,
+    source: d.value.data.category === id ? (d.published?.data.category === id ? '작업본·공개본' : '작업본') : '공개본',
+  }));
+}
+
+export interface LinkIssueDocument {
+  key: string; title: string; kind: 'post' | 'page'; status: Draft['status'];
+  sources: { source: '작업본' | '공개본'; links: { target: string; label: string; line: number }[] }[];
+}

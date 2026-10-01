@@ -1,16 +1,17 @@
 import { unified } from '@astrojs/markdown-remark';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import type { BrokenWikilink } from './obsidian.ts';
 import { remarkObsidian } from './obsidian.ts';
 import { remarkDynamicBlocks } from './dynamic-blocks.ts';
 import type { Content } from '../lib/content.ts';
 import type { RehypePlugins } from '@astrojs/markdown-remark';
-export function createMarkdownOptions(content?: Content, extraRehypePlugins: RehypePlugins = []) {
+export function createMarkdownOptions(content?: Content, extraRehypePlugins: RehypePlugins = [], onBrokenWikilink?: (link: BrokenWikilink) => void) {
   return {
     processor: unified({
       gfm: true,
       smartypants: false,
-      remarkPlugins: [remarkMath, [remarkObsidian, { content }], [remarkDynamicBlocks, { content }]],
+      remarkPlugins: [remarkMath, [remarkObsidian, { content, onBrokenWikilink }], [remarkDynamicBlocks, { content }]],
       rehypePlugins: [rehypeKatex, ...extraRehypePlugins],
       remarkRehype: { footnoteLabel: '각주', footnoteBackLabel: '본문으로 돌아가기' },
     }),

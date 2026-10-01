@@ -90,3 +90,11 @@ button:disabled, input:disabled { opacity: .55; cursor: default; }
  .registry-row { grid-template-columns: minmax(0, 1fr) 100px; }
  .registry-row code { grid-column: 1 / -1; }
 }
+
+.category-delete-notice { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
+.category-delete-notice p { margin-block: 12px; }
+.link-issues { max-width: 900px; overflow-wrap: anywhere; }
+.link-issue-list { list-style: none; padding: 0; }
+.link-issue-list > li { padding-block: 24px; border-top: 1px solid var(--line); }
+.link-issue-list > li > button { padding-inline: 0; border: 0; text-align: left; font-weight: 650; }
+.link-issue-list ul { margin-block: 12px 20px; }

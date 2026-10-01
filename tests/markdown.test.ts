@@ -28,8 +28,9 @@ test('extension syntax inside code or normal links remains unchanged', async () 
   assert.doesNotMatch(code, /<mark>|<mory-search>|<video/);
   assert.match(code, /\[\[missing-slug\]\]/);
 });
-test('invalid wikilinks and unsafe assets fail with structured diagnostic identifiers', async () => {
-  await assert.rejects(renderer.render('[[missing-slug]]', options), error => /존재하지 않는 wikilink slug/.test(String(error)) && (error as { ruleId: string }).ruleId === 'wikilink');
+test('missing wikilinks degrade to text while unsafe assets still fail', async () => {
+  const { code } = await renderer.render('[[missing-slug]] [[missing-slug|표시 제목]]', options);
+  assert.match(code, /missing-slug/); assert.match(code, /표시 제목/); assert.doesNotMatch(code, /href=/);
   await assert.rejects(renderer.render('![[../image.webp]]', options), /잘못된 첨부파일 경로/);
 });
 test('all five dynamic blocks work in pages and only count is supported', async () => {
@@ -76,7 +77,7 @@ test('series-writing validates IDs/options, handles empty public series, and sta
 });
 test('build pre-validation makes Markdown errors fatal with the filename', async () => {
   const fixture = fixtureContent();
-  fixture.posts[0].body = '[[missing-build-reference]]';
+  fixture.posts[0].body = '![[../unsafe.webp]]';
   const { validateMarkdown } = await import('../src/lib/validate-markdown.ts');
   await assert.rejects(validateMarkdown(fixture), /src\/content\/posts\/a-place-to-write.md/);
 });

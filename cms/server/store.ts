@@ -6,7 +6,7 @@ import { ulid } from 'ulid';
 import { readContent } from '../../src/lib/content.ts';
 import { publicationTime } from '../../src/lib/dates.ts';
 import { routeId, ulid as idSchema } from '../../src/lib/schema.ts';
-import { CmsError } from '../shared.ts';
+import { CmsError, categoryReferences } from '../shared.ts';
 import type { Draft, Kind, Payload, PublishJob, LocalSync } from '../shared.ts';
 import { assertRuntimeLocation } from './config.ts';
 
@@ -102,8 +102,8 @@ export class Store {
   }
   assertCategoriesDeletedSafely(before: Record<string, any>, after: Record<string, any>) {
     for (const id of Object.keys(before).filter(id => !Object.hasOwn(after, id))) {
-      if (this.list().some(d => d.kind === 'post' && (d.value.data.category === id || d.published?.data.category === id)))
-        throw new CmsError(400, '이 분류를 사용하는 글이 있습니다. 초안과 보관된 글까지 다른 분류로 옮겨주세요.');
+      const references = categoryReferences(this.list(), id);
+      if (references.length) throw new CmsError(400, `이 분류를 사용하는 글 ${references.length}개가 있어 삭제할 수 없습니다: ${references.slice(0, 5).map(d => `${d.title} (${d.source})`).join(', ')}. 초안·보관된 글도 포함됩니다. 글을 다른 분류로 옮기고, 공개본에서 사용하는 분류도 변경사항을 게시해 반영해 주세요.`);
     }
   }
   removePostReferences(id: string) {

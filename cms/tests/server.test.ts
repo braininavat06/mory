@@ -9,9 +9,11 @@ import { Store } from '../server/store.ts';
 import { Publisher, githubDeployment } from '../server/publish.ts';
 import { createApp } from '../server/app.ts';
 import { backup } from '../server/backup.ts';
+import { linkIssues } from '../server/link-issues.ts';
 import { renderPreview } from '../server/preview.ts';
 import { readContent, publicSeries } from '../../src/lib/content.ts';
 import { displayDate, publicationTime } from '../../src/lib/dates.ts';
+import { categoryReferences } from '../shared.ts';
 import type { Draft, Payload } from '../shared.ts';
 import { writeFixtureContent } from '../../tests/fixtures.ts';
 const source = resolve('.');
@@ -75,10 +77,10 @@ test('exact revision publishing, independent documents, idempotent double taps, 
 test('invalid schema and Markdown never commit; rejected push keeps SQLite; global publish mutex', async () => {
   const f=setup();
   try {
-    let draft=modify(f.store,f.store.create('post'),{title:'실패',slug:'failure'},'[[missing]]');
+    let draft=modify(f.store,f.store.create('post'),{title:'실패',slug:'failure'},'![[../unsafe.webp]]');
     const before=git(f.root,['rev-parse','HEAD']);
     assert.equal((await publish(f,draft)).state,'failed'); assert.equal(git(f.publisher.repo,['rev-parse','HEAD']),before);
-    assert.equal(f.store.get(draft.key).value.body,'[[missing]]');
+    assert.equal(f.store.get(draft.key).value.body,'![[../unsafe.webp]]');
     draft=modify(f.store,draft,{},'수정 후 내용');
     const hook=join(f.remote,'hooks/pre-receive'); writeFileSync(hook,'#!/bin/sh\nexit 1\n',{mode:0o755});
     assert.equal((await publish(f,draft)).state,'failed'); assert.equal(f.store.get(draft.key).status,'초안'); assert.equal(f.store.get(draft.key).value.body,'수정 후 내용');
@@ -97,7 +99,17 @@ test('external public file change blocks publishing; categories guard all status
    writeFileSync(join(f.root,draft.path),readFileSync(join(f.root,draft.path),'utf8')+'\n외부 수정');
    git(f.root,['add','.']);git(f.root,['commit','-m','external']);git(f.root,['push',f.remote,'main']);
    assert.equal((await publish(f,changed)).state,'conflict');assert.equal(f.store.get(draft.key).value.data.title,'CMS 입력');
-   const cats=f.store.get('categories:registry');assert.throws(()=>f.store.save(cats.key,cats.revision,{data:{},body:''}),/분류를 사용하는 글/);
+   const cats=f.store.get('categories:registry');
+   assert.throws(()=>f.store.save(cats.key,cats.revision,{data:{},body:''}),/분류를 사용하는 글/);
+   assert.deepEqual(f.store.get(cats.key),cats,'rejected deletion preserves registry and revision');
+   const id=draft.value.data.category;
+   const examples: Draft[]=[
+     {...draft,key:'draft',status:'초안',published:null},
+     {...draft,key:'archived',status:'보관됨'},
+     {...draft,key:'public-only',value:{...draft.value,data:{...draft.value.data,category:'other'}}},
+   ];
+   assert.deepEqual(categoryReferences(examples,id).map(d=>[d.key,d.source]),[['draft','작업본'],['archived','작업본·공개본'],['public-only','공개본']]);
+   assert.equal(categoryReferences(examples,'unused').length,0);
    const updated=f.store.save(cats.key,cats.revision,{data:{...cats.value.data,new:{name:'새 분류',order:20}},body:''});
    assert.throws(()=>modify(f.store,changed,{category:'new'}),/게시된 분류/);
    assert.equal((await publish(f,updated)).state,'deploying');assert.ok(f.store.get('categories:registry').published!.data.new);
@@ -237,4 +249,61 @@ test('slug editing preserves published aliases without leaking intermediate auto
     d=f.store.save(d.key,d.revision,{...d.value,data:{...d.value.data,slug:original.value.data.slug}},true);
     assert.ok(!d.value.data.aliases.includes(d.value.data.slug));
   }finally{f.cleanup();}
+});
+
+test('mutually linked archived posts can be deleted independently without changing another draft', async()=>{
+ const f=setup();
+ try {
+  let target=f.store.list().find(d=>d.kind==='post'&&d.ever_published)!;
+  let reference=f.store.create('post');
+  reference=modify(f.store,reference,{title:'링크가 있는 글',slug:'delete-reference'},`[[${target.value.data.slug}]]`);
+  assert.equal((await publish(f,reference)).state,'deploying');
+  target=modify(f.store,target,{},'[[delete-reference]]');await publish(f,target);
+  reference=f.store.get(reference.key);await publish(f,reference,'archive');
+  await publish(f,f.store.get(target.key),'archive');target=f.store.get(target.key);
+  const before=f.store.get(reference.key);
+  const job=await publish(f,target,'delete');assert.equal(job.state,'deploying');
+  assert.throws(()=>f.store.get(target.key),/찾지 못/);
+  assert.deepEqual(f.store.get(reference.key),before);
+  const issues=await linkIssues(f.store);
+  const issue=issues.find(d=>d.key===reference.key)!;assert.ok(issue);
+  assert.deepEqual(issue.sources.map(s=>s.source),['작업본','공개본']);
+  assert.equal((await publish(f,before,'delete')).state,'deploying');
+  assert.ok(!(await linkIssues(f.store)).some(d=>d.key===reference.key));
+ }finally{f.cleanup();}
+});
+
+test('link issue scan separates saved workspace and public sources, includes Pages and excludes code/media', async()=>{
+ const f=setup();
+ try {
+  const page=f.store.get('page:home');
+  const body='[[first-missing|표시 제목]]\n\n`[[inline-code]]`\n\n```text\n[[fenced-code]]\n```\n\n![[shared/image.webp]]\n\n[보통 링크](https://example.com)';
+  let updated=modify(f.store,page,{},body);
+  assert.equal((await publish(f,updated)).state,'deploying');
+  updated=f.store.get(page.key);modify(f.store,updated,{},'[[second-missing]]');
+  const issue=(await linkIssues(f.store)).find(d=>d.key===page.key)!;
+  assert.equal(issue.kind,'page');assert.equal(issue.sources[0].links[0].target,'second-missing');
+  assert.deepEqual(issue.sources[1].links,[{target:'first-missing',label:'표시 제목',line:1}]);
+  const origin='http://127.0.0.1:40009',app=createApp(f.store,f.publisher,origin);
+  const response=await app.request(origin+'/api/link-issues',{headers:{host:'127.0.0.1:40009'}});
+  assert.equal(response.status,200);assert.ok((await response.json() as any[]).some(d=>d.key===page.key));
+  const revision=f.store.get(page.key).revision;
+  await linkIssues(f.store);assert.equal(f.store.get(page.key).revision,revision);
+ }finally{f.cleanup();}
+});
+
+test('a populated series can be deleted without deleting or altering any post', async()=>{
+ const f=setup();
+ try {
+  const posts=f.store.list().filter(d=>d.kind==='post');
+  let series=f.store.create('series','populated-series');
+  series=modify(f.store,series,{name:'글이 있는 시리즈',posts:posts.map(d=>d.id)});
+  assert.equal((await publish(f,series)).state,'deploying');
+  series=f.store.get(series.key);
+  assert.equal((await publish(f,series,'delete')).state,'deploying');
+  assert.throws(()=>f.store.get(series.key),/찾지 못/);
+  assert.ok(!readContent(f.publisher.repo).series['populated-series']);
+  for(const post of posts)assert.deepEqual(f.store.get(post.key),post);
+  assert.equal(readContent(f.publisher.repo).posts.length,posts.length);
+ }finally{f.cleanup();}
 });

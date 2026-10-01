@@ -178,7 +178,8 @@ export class Publisher {
           }
         }
         this.write(row, job.snapshot);
-        const content = readContent(this.repo); await validateMarkdown(content, this.repo);
+        const content = readContent(this.repo);
+        await validateMarkdown(content, this.repo);
         // One scoped commit only. No developer working-tree files are staged.
         await this.git(['add', '--', ...touched]);
         let sha: string;
@@ -223,7 +224,7 @@ export class Publisher {
       const conflict = error instanceof CmsError && error.status === 409;
       // Full errors stay on the server. Credentials/Git diagnostics never enter the UI.
       console.error('CMS publish failed:', error instanceof CmsError ? error.message : error instanceof Error ? error.message.replace(/https?:\/\/[^\s]+/g, '[remote]') : 'unknown');
-      this.store.updateJob(id, { state: conflict ? 'conflict' : 'failed', error: error instanceof CmsError ? error.message : /콘텐츠 검증|Markdown 검증/.test(String(error)) ? String(error).replaceAll(this.repo + '/', '') : '게시하지 못했습니다. 작업본은 보존되어 있습니다. 연결과 서버 설정을 확인하고 다시 시도하세요.' });
+      this.store.updateJob(id, { state: conflict ? 'conflict' : 'failed', error: error instanceof CmsError ? error.message : /콘텐츠 검증|Markdown 검증/.test(String(error)) ? (error instanceof Error ? error.message : String(error)).replaceAll(this.repo + '/', '') : '게시하지 못했습니다. 작업본은 보존되어 있습니다. 연결과 서버 설정을 확인하고 다시 시도하세요.' });
     }
   }
   async finishPush(row: Draft, job: PublishJob, sha: string, seriesChanges: { id: string; path: string; payload: Payload }[] = []) {

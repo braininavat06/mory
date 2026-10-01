@@ -45,7 +45,7 @@ export function Tips() {
     <section>
       <h2>다른 글 연결하기</h2>
       <Example>{'[[some-post-slug]]\n\n[[some-post-slug|독자에게 보여줄 이름]]'}</Example>
-      <p>글 제목이나 ID 대신 게시 설정의 <strong>slug</strong>를 넣습니다. 게시된 글은 해당 글로 연결되고, 초안·보관된 글은 링크 없이 텍스트로 표시됩니다. 존재하지 않는 slug는 게시 검증 오류가 됩니다.</p>
+      <p>글 제목이나 ID 대신 게시 설정의 <strong>slug</strong>를 넣습니다. 게시된 글은 해당 글로 연결되고, 초안·보관된 글은 링크 없이 텍스트로 표시됩니다. 존재하지 않는 slug도 텍스트로 표시하며 게시를 막지 않습니다. 끊어진 링크는 오류 해결 메뉴에서 확인할 수 있습니다.</p>
     </section>
     <section>
       <h2>이미지와 자체 동영상</h2>

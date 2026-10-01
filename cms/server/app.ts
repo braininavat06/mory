@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { CmsError } from '../shared.ts';
 import type { Store } from './store.ts';
 import type { Publisher } from './publish.ts';
+import { linkIssues } from './link-issues.ts';
 import { renderPreview } from './preview.ts';
 const keySchema = z.string().regex(/^(post:[0-7][0-9A-HJKMNP-TV-Z]{25}|page:(home|about)|categories:registry|series:[a-z0-9]+(?:-[a-z0-9]+)*)$/);
 export function createApp(store: Store, publisher: Publisher, origin: string) {
@@ -29,6 +30,7 @@ export function createApp(store: Store, publisher: Publisher, origin: string) {
     if (error instanceof z.ZodError) return c.json({ error: error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join('\n') }, 400);
     console.error('CMS request failed:', error.message); return c.json({ error: '서버 요청을 처리하지 못했습니다. 입력 내용은 이 창에 보존되어 있습니다.' }, 500);
   });
+  app.get('/api/link-issues', async c => c.json(await linkIssues(store)));
   app.get('/api/health', c => c.json({ service: 'mory-cms', ok: true }));
   app.get('/api/state', async c => {
     await Promise.all(store.jobs().filter(j => j.state === 'deploying' || (j.state === 'failed' && j.pushed_at)).map(j => publisher.deployment(j.id)));

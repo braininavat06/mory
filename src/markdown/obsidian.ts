@@ -22,7 +22,8 @@ function youtubeId(raw: string): string | undefined {
     return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : undefined;
   } catch { return; }
 }
-export function remarkObsidian(options: { content?: Content } = {}) {
+export interface BrokenWikilink { target: string; label: string; line: number }
+export function remarkObsidian(options: { content?: Content; onBrokenWikilink?: (link: BrokenWikilink) => void } = {}) {
   return (tree: Root, file: VFile) => {
     const content = options.content ?? readContent();
     const path = (file.path ?? '').replace(/\\/g, '/');
@@ -74,8 +75,11 @@ export function remarkObsidian(options: { content?: Content } = {}) {
               : `<img src="${escapeHtml(url!)}" alt="${escapeHtml(name)}"${width} loading="lazy" decoding="async" />` });
           } else {
             const post = content.posts.find(p => p.data.slug === target);
-            if (!post) file.fail(`존재하지 않는 wikilink slug: ${target}`, text.position, 'mory:wikilink');
-            if (post!.data.status !== 'published') {
+            if (!post) {
+              file.message(`존재하지 않는 wikilink slug: ${target}; 텍스트로 표시합니다.`, text.position, 'mory:wikilink');
+              options.onBrokenWikilink?.({ target, label: label || target, line: (text.position?.start.line ?? 1) + text.value.slice(0, match.index).split('\n').length - 1 });
+              result.push({ type: 'text', value: label || target });
+            } else if (post.data.status !== 'published') {
               file.message(`비공개 글을 참조하는 wikilink: ${target}; 공개 링크를 생성하지 않습니다.`, text.position, 'mory:wikilink');
               result.push({ type: 'text', value: label || target });
             } else result.push({ type: 'link', url: `/writing/${target}/`, children: [{ type: 'text', value: label || target }] });
