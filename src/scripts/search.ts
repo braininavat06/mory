@@ -35,14 +35,14 @@ class MorySearch extends HTMLElement {
       list.replaceChildren();
       if (!query) { status.textContent = '검색어를 입력하세요.'; return; }
       if (this.hasAttribute('data-empty-archive')) { status.textContent = '아직 공개된 글이 없습니다.'; return; }
-      status.textContent = '검색 중…';
+      status.textContent = `“${query}” 검색 중…`;
       list.setAttribute('aria-busy', 'true');
       try {
         const pagefind = await api();
         const search = await pagefind.search(query);
         const data = await Promise.all(search.results.map(result => result.data()));
         if (sequence !== this.sequence) return;
-        status.textContent = data.length ? `${data.length}개의 글을 찾았습니다.` : '일치하는 글이 없습니다.';
+        status.textContent = data.length ? `“${query}” 검색 결과: ${data.length}개의 글` : `“${query}” 검색 결과: 일치하는 글이 없습니다.`;
         for (const result of data) {
           const url = new URL(result.url, window.location.origin);
           if (url.origin !== window.location.origin || !url.pathname.startsWith('/writing/')) continue;

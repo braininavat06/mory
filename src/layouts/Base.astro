@@ -42,16 +42,16 @@ const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.path
   <header class="site-header" data-pagefind-ignore>
     <a class="wordmark" href="/" aria-label="Mory 홈">Mory<span aria-hidden="true">.</span></a>
     <nav aria-label="주 메뉴">
-      <a href="/writing/" aria-current={writingActive ? 'page' : undefined}>Writing</a>
-      <a href="/about/" aria-current={Astro.url.pathname === '/about/' ? 'page' : undefined}>About</a>
-      <button type="button" data-open-search aria-haspopup="dialog">Search</button>
+      <a href="/writing/" aria-current={writingActive ? 'page' : undefined}>글</a>
+      <a href="/about/" aria-current={Astro.url.pathname === '/about/' ? 'page' : undefined}>소개</a>
+      <button type="button" data-open-search aria-haspopup="dialog">검색</button>
     </nav>
-    <label class="theme-control"><span class="visually-hidden">테마</span><select name="theme" aria-label="테마 선택" data-theme-select><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+    <label class="theme-control"><span class="visually-hidden">테마</span><select name="theme" aria-label="테마 선택" data-theme-select><option value="system">시스템</option><option value="light">밝게</option><option value="dark">어둡게</option></select></label>
   </header>
   <main id="main" tabindex="-1"><slot /></main>
   <footer class="site-footer" data-pagefind-ignore><span>Mory — 개인 홈페이지와 글 아카이브</span><a href="/rss.xml">RSS</a></footer>
   <dialog class="search-dialog" aria-labelledby="search-dialog-title" data-search-dialog data-pagefind-ignore>
-    <div class="dialog-header"><h2 id="search-dialog-title">Search Writing</h2><button type="button" data-close-search aria-label="검색 닫기">닫기 ×</button></div>
+    <div class="dialog-header"><h2 id="search-dialog-title">글 검색</h2><button type="button" data-close-search aria-label="검색 닫기">닫기 ×</button></div>
     <Search />
   </dialog>
   <script>

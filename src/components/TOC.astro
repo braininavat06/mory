@@ -3,7 +3,7 @@ interface Props { headings: { depth: number; slug: string; text: string }[] }
 const headings = Astro.props.headings.filter(h => (h.depth === 2 || h.depth === 3) && h.slug !== 'footnote-label');
 ---
 {headings.length > 0 && <aside class="toc" aria-label="목차">
-  <details data-toc><summary>목차 <span aria-hidden="true">↕</span></summary>
+  <details data-toc><summary>목차 <span class="toc-expand">펼치기 +</span><span class="toc-collapse">접기 −</span></summary>
     <nav aria-label="글 목차"><ol>{headings.map(h => <li class:list={{ 'toc-subheading': h.depth === 3 }}><a href={`#${h.slug}`}>{h.text}</a></li>)}</ol></nav>
   </details>
   <script is:inline>

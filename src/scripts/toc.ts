@@ -2,6 +2,9 @@ export {};
 const toc = document.querySelector<HTMLDetailsElement>('[data-toc]');
 if (toc) {
   const links = [...toc.querySelectorAll<HTMLAnchorElement>('a')];
+  links.forEach(link => link.addEventListener('click', () => {
+    if (matchMedia('(max-width: 999px)').matches) toc.open = false;
+  }));
   const headings = links.map(link => document.getElementById(decodeURIComponent(link.hash.slice(1))));
   let queued = false;
   const update = () => {
