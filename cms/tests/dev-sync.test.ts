@@ -14,7 +14,7 @@ const git = (cwd: string, args: string[]) => execFileSync('git', ['-c','user.nam
 function setup() {
   const temp = mkdtempSync(join(tmpdir(), 'mory-sync-')), root = join(temp, 'dev'), remote = join(temp,'remote.git'), other = join(temp,'other');
   mkdirSync(root);
-  for (const path of ['src','data','.gitignore']) cpSync(join(resolve('.'),path),join(root,path),{recursive:true});
+  for (const path of ['src','.gitignore']) cpSync(join(resolve('.'),path),join(root,path),{recursive:true});
   writeFixtureContent(root);
   writeFileSync(join(root,'code.ts'),'base\n');
   git(root,['init','-b','main']);git(root,['add','.']);git(root,['commit','-m','initial']);

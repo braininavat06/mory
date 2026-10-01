@@ -22,7 +22,8 @@ function setup() {
   const temp = mkdtempSync(join(tmpdir(), 'mory-cms-test-')), root = join(temp, 'site'), remote = join(temp, 'remote.git');
   mkdirSync(root);
   cpSync(join(source,'.gitignore'),join(root,'.gitignore'));
-  for (const dir of ['src', 'data']) cpSync(join(source, dir), join(root, dir), { recursive: true });
+  // Content registries come exclusively from writeFixtureContent below.
+  cpSync(join(source, 'src'), join(root, 'src'), { recursive: true });
   writeFixtureContent(root);
   git(root, ['init', '-b', 'main']); git(root, ['add', '.']); git(root, ['commit', '-m', 'fixture']); git(temp, ['clone','--bare',root,remote]);
   git(root,['remote','add','origin',remote]);
