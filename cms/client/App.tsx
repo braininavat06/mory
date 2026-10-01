@@ -8,10 +8,18 @@ const CodeEditor = lazy(() => import('./CodeEditor.tsx'));
 import { displayDate } from '../../src/lib/dates.ts';
 import './style.css';
 import { useScrollSync } from './scroll-sync.ts';
-type State = { drafts: Draft[]; jobs: PublishJob[]; localSync: LocalSync | null };
+type State = { drafts: Draft[]; jobs: PublishJob[]; localSync: LocalSync | null; canRetryDeployment?: boolean };
 const menuLabels: Record<string, string> = { Writing: '글', Categories: '분류', Series: '시리즈', Pages: '페이지' };
 const recoveryStorage = { getItem: (key: string) => { try { return localStorage.getItem(key); } catch { return null; } }, setItem: (key: string, value: string) => { try { localStorage.setItem(key, value); } catch {} }, removeItem: (key: string) => { try { localStorage.removeItem(key); } catch {} } };
 const name = (d: Draft) => d.value.data.title || d.value.data.name || (d.kind === 'categories' ? '분류' : '제목 없는 글');
+function jobLabel(job: PublishJob) {
+  const action = { publish: '게시', archive: '보관', restore: '복원', delete: '삭제' }[job.action];
+  if (job.state === 'publishing') return `${action} 중`;
+  if (job.state === 'deploying') return '배포 중';
+  if (job.state === 'complete') return `${action} 완료`;
+  if (job.state === 'conflict') return '충돌 발생';
+  return job.pushed_at ? '배포 실패' : `${action} 실패`;
+}
 function App() {
   const [state, setState] = useState<State>({ drafts: [], jobs: [], localSync: null });
   const [menu, setMenu] = useState('Writing'), [selected, setSelected] = useState<Draft | null>(null), [error, setError] = useState('');
@@ -23,7 +31,7 @@ function App() {
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { if (!state.jobs.some(j => ['publishing', 'deploying'].includes(j.state))) return; const timer = setInterval(() => { void refresh(); }, 4000); return () => clearInterval(timer); }, [state.jobs.some(j => ['publishing', 'deploying'].includes(j.state)), refresh]);
   const needsSync = (job: PublishJob | undefined) => !!state.localSync?.pending && job?.commit_sha === state.localSync.publication_sha;
-  const listingStatus = (d: Draft) => { const job = state.jobs.find(j => j.key === d.key); const base = d.kind === 'series' && !d.published ? '미게시' : d.status; const label = !job || job.state === 'complete' ? base : `${base} · ${job.state === 'publishing' ? '게시 중' : job.state === 'deploying' ? '배포 중' : job.state === 'conflict' ? '충돌 발생' : job.pushed_at ? '배포 실패' : '게시 실패'}`; return label + (needsSync(job) ? ' · 로컬 저장소 동기화 필요' : ''); };
+  const listingStatus = (d: Draft) => { const job = state.jobs.find(j => j.key === d.key); const base = d.kind === 'series' && !d.published ? '미게시' : d.status; const label = !job || job.state === 'complete' ? base : `${base} · ${jobLabel(job)}`; return label + (needsSync(job) ? ' · 로컬 저장소 동기화 필요' : ''); };
   useEffect(() => { if (menu === 'Categories' && !selected) { const registry = state.drafts.find(d => d.kind === 'categories'); if (registry) setSelected(registry); } }, [menu, selected, state.drafts]);
   const select = (d: Draft) => { setSelected(d); setError(''); };
   const publishedCategories = state.drafts.find(d => d.kind === 'categories')?.published?.data ?? {};
@@ -127,8 +135,8 @@ function Editor({ initial, state, refresh, back, navigateGuard }: { navigateGuar
     {autosave.state === 'conflict' && <section className="notice"><p>다른 창이나 기기에서 저장한 서버 최신본이 있습니다. 현재 입력은 이 창에 보존됩니다.</p><button onClick={() => void reload()}>서버 최신본 불러오기</button></section>}
     {autosave.failed && autosave.state === 'unsaved' && !locked && <button onClick={() => void autosave.flush().catch(e => setError((e as Error).message))}>자동저장 다시 시도</button>}
     {autosave.failed && autosave.state === 'unsaved' && !locked && <button onClick={() => void reload()}>서버 저장본 불러오기</button>}
-    {job && <p className="publish-status" role="status">{job.state === 'publishing' ? '게시 중…' : job.state === 'deploying' ? '배포 중…' : job.state === 'complete' ? '게시 완료' : job.state === 'conflict' ? '충돌 발생' : job.pushed_at ? '배포 실패' : '게시 실패'}{(job.state === 'deploying' || job.state === 'complete') && (dirty || autosave.draft.status === '수정 중') ? ' · 미게시 변경 있음' : ''}{job.error && ` · ${job.error}`}{state.localSync?.pending && job.commit_sha === state.localSync.publication_sha ? ' · 로컬 저장소 동기화 필요' : ''}</p>}
-    {job?.state === 'failed' && job.pushed_at && <button onClick={() => void api<PublishJob>(`/api/jobs/${job.id}/retry`, 'POST', {}).then(setJob).catch(e => setError(e.message))}>배포 다시 시도</button>}
+    {job && <p className="publish-status" role="status">{jobLabel(job)}{['publishing', 'deploying'].includes(job.state) ? '…' : ''}{(job.state === 'deploying' || job.state === 'complete') && (dirty || autosave.draft.status === '수정 중') ? ' · 미게시 변경 있음' : ''}{job.error && ` · ${job.error.replace(/^배포 실패\.\s*/, '')}`}{state.localSync?.pending && job.commit_sha === state.localSync.publication_sha ? ' · 로컬 저장소 동기화 필요' : ''}</p>}
+    {job?.state === 'failed' && job.pushed_at && (state.canRetryDeployment ? <button onClick={() => void api<PublishJob>(`/api/jobs/${job.id}/retry`, 'POST', {}).then(setJob).catch(e => setError(e.message))}>배포 다시 시도</button> : job.run_url && <p><a href={job.run_url} target="_blank" rel="noopener noreferrer">GitHub에서 배포 확인·재시도 →</a></p>)}
     {job?.state === 'conflict' && <button onClick={() => { if (confirm('현재 입력은 복구 사본으로 남기고 외부에서 변경된 공개본을 불러올까요?')) void reload(true); }}>공개본 다시 불러오기</button>}
     <fieldset disabled={locked || !!recovery}>
     {['post', 'page'].includes(initial.kind) && <>

@@ -13,6 +13,7 @@ import { renderPreview } from '../server/preview.ts';
 import { readContent, publicSeries } from '../../src/lib/content.ts';
 import { displayDate, publicationTime } from '../../src/lib/dates.ts';
 import type { Draft, Payload } from '../shared.ts';
+import { writeFixtureContent } from '../../tests/fixtures.ts';
 const source = resolve('.');
 const git = (cwd: string, args: string[]) => execFileSync('git', ['-c','user.name=Test','-c','user.email=test@example.invalid',...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 function setup() {
@@ -20,6 +21,7 @@ function setup() {
   mkdirSync(root);
   cpSync(join(source,'.gitignore'),join(root,'.gitignore'));
   for (const dir of ['src', 'data']) cpSync(join(source, dir), join(root, dir), { recursive: true });
+  writeFixtureContent(root);
   git(root, ['init', '-b', 'main']); git(root, ['add', '.']); git(root, ['commit', '-m', 'fixture']); git(temp, ['clone','--bare',root,remote]);
   git(root,['remote','add','origin',remote]);
   const store = new Store(root, join(temp, 'runtime'));
@@ -186,8 +188,12 @@ test('failed deployment retry reuses its job, requires server authority and neve
   const f=setup(); try {
     const d=modify(f.store,f.store.create('post'),{title:'배포 재시도',slug:'deploy-retry'},'내용');const job=await publish(f,d);
     f.store.updateJob(job.id,{state:'failed',run_url:'https://github.com/braininavat06/mory/actions/runs/123',error:'배포 실패'});
+    const origin='http://127.0.0.1:40009',app=createApp(f.store,f.publisher,origin);
+    const state=async()=> (await app.request(origin+'/api/state',{headers:{host:'127.0.0.1:40009'}})).json();
+    assert.equal((await state()).canRetryDeployment,false);
     await assert.rejects(f.publisher.retryDeployment(job.id),/서버의 GitHub 권한/);
     let calls=0;f.publisher.options.retryDeployment=async()=>{calls++;await new Promise(r=>setTimeout(r,10));};
+    assert.equal((await state()).canRetryDeployment,true);
     const count=git(f.publisher.repo,['rev-list','--count','HEAD']);await Promise.all([f.publisher.retryDeployment(job.id),f.publisher.retryDeployment(job.id)]);
     assert.equal(calls,1);assert.equal(f.store.job(job.id).state,'deploying');assert.equal(git(f.publisher.repo,['rev-list','--count','HEAD']),count);
   }finally{f.cleanup();}

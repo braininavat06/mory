@@ -8,11 +8,13 @@ import { Store } from '../server/store.ts';
 import { Publisher } from '../server/publish.ts';
 import { remoteIdentity } from '../server/dev-sync.ts';
 import { createApp } from '../server/app.ts';
+import { writeFixtureContent } from '../../tests/fixtures.ts';
 const git = (cwd: string, args: string[]) => execFileSync('git', ['-c','user.name=Test','-c','user.email=test@example.invalid', ...args], { cwd, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }).trim();
 function setup() {
   const temp = mkdtempSync(join(tmpdir(), 'mory-sync-')), root = join(temp, 'dev'), remote = join(temp,'remote.git'), other = join(temp,'other');
   mkdirSync(root);
   for (const path of ['src','data','.gitignore']) cpSync(join(resolve('.'),path),join(root,path),{recursive:true});
+  writeFixtureContent(root);
   writeFileSync(join(root,'code.ts'),'base\n');
   git(root,['init','-b','main']);git(root,['add','.']);git(root,['commit','-m','initial']);
   git(temp,['clone','--bare',root,remote]);git(root,['remote','add','origin',remote]);git(temp,['clone',remote,other]);

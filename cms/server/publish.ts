@@ -305,6 +305,6 @@ export function githubDeployment(remote: string, token?: string, workflow = 'dep
     const data = await response.json() as { workflow_runs: { head_sha: string; status: string; conclusion: string | null; html_url: string; run_attempt: number }[] };
     const run = data.workflow_runs.filter(r => r.head_sha === sha).sort((a, b) => b.run_attempt - a.run_attempt)[0];
     if (!run) return { state: 'deploying' };
-    return { state: run.status !== 'completed' ? 'deploying' : run.conclusion === 'success' ? 'complete' : 'failed', url: run.html_url, error: run.status === 'completed' && run.conclusion !== 'success' ? '배포 실패. 작업본은 보존되어 있습니다.' : undefined };
+    return { state: run.status !== 'completed' ? 'deploying' : run.conclusion === 'success' ? 'complete' : 'failed', url: run.html_url, error: run.status === 'completed' && run.conclusion !== 'success' ? '작업본은 보존되어 있습니다. GitHub에서 실패 원인을 확인하세요.' : undefined };
   };
 }

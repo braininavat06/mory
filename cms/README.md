@@ -106,6 +106,8 @@ push 후 개발 저장소 동기화 실패는 게시 실패가 아닙니다. 공
 
 GitHub의 deploy.yml workflow에서 해당 SHA/push event를 조회합니다. push는 “배포 중”, 실제 workflow success만 “게시 완료”, 실패는 “배포 실패”입니다. API 오류/조회 지연/권한 없음은 완료로 표시하지 않습니다. 무인증 조회는 최대 분당 한 번, token 설정 시 15초 간격입니다. 배포 실패 재시도는 server token의 Actions write 권한이 필요하며 기존 run을 재실행하므로 추가 content commit을 만들지 않습니다.
 
+서버에 배포 재시도 인증이 설정되지 않았다면 재시도 버튼 대신 해당 GitHub Actions 실행 링크를 표시합니다. API는 재시도 가능 여부만 전달하며 credential은 전달하지 않습니다. CMS 통합 테스트의 Markdown/YAML은 `tests/fixtures.ts`에서 임시 저장소에 생성하므로 실제 글의 보관·삭제·분류 변경에 영향을 받지 않습니다.
+
 게시 자체의 validation/통신 실패와 실제 배포 실패를 구분합니다. 공개 파일이 base hash와 다르면 중단합니다. 자동 merge는 없습니다. 새 글 또는 아직 Git에 없는 시리즈를 먼저 참조하는 시리즈 게시에는 공유 validator의 없는 post ID 오류가 날 수 있습니다. 해당 글부터 게시하세요. 영구 삭제할 글을 다른 글의 wikilink가 참조하면 먼저 그 링크를 수정해야 validation을 통과합니다.
 
 ## 분류·시리즈·페이지·보관
