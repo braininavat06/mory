@@ -5,7 +5,7 @@ slug: a-place-to-write
 category: sample
 publishedAt: 2026-09-29
 updatedAt: 2026-10-01T22:01:10+09:00
-status: published
+status: archived
 description: Markdown으로 글을 쓰고, 관심을 따라 기록을 쌓아가는 공간. 기능 검증을 위한 샘플 글입니다.
 aliases:
   - first-note
