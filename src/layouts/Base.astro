@@ -34,7 +34,7 @@ const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.path
   {updatedAt && <meta property="article:modified_time" content={updatedAt} />}
   {noindex && <meta name="robots" content="noindex,follow" />}
   {redirect && <meta http-equiv="refresh" content={`0;url=${redirect}`} />}
-  <link rel="alternate" type="application/rss+xml" title="Mory Writing" href="/rss.xml" />
+  <link rel="alternate" type="application/rss+xml" title="Mory 글 구독" href="/rss.xml" />
   <slot name="head" />
 </head>
 <body>

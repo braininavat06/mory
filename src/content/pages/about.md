@@ -1,8 +1,8 @@
 ---
-title: "About"
+title: "소개"
 description: "Mory에 관하여."
 ---
-# About
+# 소개
 
 Mory는 특정 분야에 한정하지 않고 글을 모으는 개인 홈페이지입니다.
 

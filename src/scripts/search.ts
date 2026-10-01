@@ -58,7 +58,7 @@ class MorySearch extends HTMLElement {
           list.append(item);
         }
       } catch {
-        if (sequence === this.sequence) status.textContent = '검색 인덱스를 불러오지 못했습니다. 개발 환경에서는 npm run build 후 npm run preview로 검색을 확인하세요. Writing 목록에서 글을 찾을 수도 있습니다.';
+        if (sequence === this.sequence) status.textContent = '검색 인덱스를 불러오지 못했습니다. 개발 환경에서는 npm run build 후 npm run preview로 검색을 확인하세요. 글 목록에서 글을 찾을 수도 있습니다.';
       } finally { if (sequence === this.sequence) list.removeAttribute('aria-busy'); }
     });
   }

@@ -76,7 +76,7 @@ h3 { font-size: 1.2rem; }
 .writing-items h2 a { text-decoration: none; }
 .writing-items h2 a::after { content: ''; position: absolute; inset: 0; }
 .writing-items .post-meta a { position: relative; z-index: 1; }
-.writing-items li:hover h2 a { color: var(--accent); }
+.writing-items h2 a:hover { color: inherit; }
 .writing-items li > p { color: var(--muted); font-size: .95rem; margin: 0; line-height: 1.7; }
 .post-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; color: var(--muted); font-size: .8rem; }
 .post-meta a { text-decoration: none; }

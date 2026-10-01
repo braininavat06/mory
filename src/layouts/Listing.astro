@@ -7,7 +7,7 @@ import { renderWritingItems } from '../lib/html.ts';
 import { SORTS, SORT_NAMES, listUrl } from '../lib/listing.ts';
 import type { Listing } from '../lib/listing.ts';
 interface Props { listing: Listing; title?: string; categoryId?: string }
-const { listing: l, title = 'Writing', categoryId } = Astro.props;
+const { listing: l, title = '글', categoryId } = Astro.props;
 const content = readContent();
 const pageTitle = `${title}${l.sort === 'latest' ? '' : ` · ${SORT_NAMES[l.sort]}`}${l.page > 1 ? ` · ${l.page}페이지` : ''}`;
 ---

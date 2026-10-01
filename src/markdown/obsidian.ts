@@ -7,10 +7,10 @@ import { assetUrl } from '../lib/assets.ts';
 import { escapeHtml } from '../lib/html.ts';
 
 const callouts = {
-  note: { label: '참고 · Note', icon: 'ⓘ' },
-  tip: { label: '팁 · Tip', icon: '✓' },
-  important: { label: '중요 · Important', icon: '!' },
-  warning: { label: '주의 · Warning', icon: '△' },
+  note: { label: '참고', icon: 'ⓘ' },
+  tip: { label: '팁', icon: '✓' },
+  important: { label: '중요', icon: '!' },
+  warning: { label: '주의', icon: '△' },
 };
 function youtubeId(raw: string): string | undefined {
   try {
