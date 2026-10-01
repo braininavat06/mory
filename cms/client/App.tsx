@@ -8,8 +8,9 @@ const CodeEditor = lazy(() => import('./CodeEditor.tsx'));
 import { displayDate } from '../../src/lib/dates.ts';
 import './style.css';
 import { useScrollSync } from './scroll-sync.ts';
+import { Tips } from './Tips.tsx';
 type State = { drafts: Draft[]; jobs: PublishJob[]; localSync: LocalSync | null; canRetryDeployment?: boolean };
-const menuLabels: Record<string, string> = { Writing: '글', Categories: '분류', Series: '시리즈', Pages: '페이지' };
+const menuLabels: Record<string, string> = { Writing: '글', Categories: '분류', Series: '시리즈', Pages: '페이지', Tips: '팁' };
 const recoveryStorage = { getItem: (key: string) => { try { return localStorage.getItem(key); } catch { return null; } }, setItem: (key: string, value: string) => { try { localStorage.setItem(key, value); } catch {} }, removeItem: (key: string) => { try { localStorage.removeItem(key); } catch {} } };
 const name = (d: Draft) => d.value.data.title || d.value.data.name || (d.kind === 'categories' ? '분류' : '제목 없는 글');
 function jobLabel(job: PublishJob) {
@@ -17,6 +18,7 @@ function jobLabel(job: PublishJob) {
   if (job.state === 'publishing') return `${action} 중`;
   if (job.state === 'deploying') return '배포 중';
   if (job.state === 'complete') return `${action} 완료`;
+  if (job.state === 'superseded') return '후속 배포 완료';
   if (job.state === 'conflict') return '충돌 발생';
   return job.pushed_at ? '배포 실패' : `${action} 실패`;
 }
@@ -31,7 +33,7 @@ function App() {
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { if (!state.jobs.some(j => ['publishing', 'deploying'].includes(j.state))) return; const timer = setInterval(() => { void refresh(); }, 4000); return () => clearInterval(timer); }, [state.jobs.some(j => ['publishing', 'deploying'].includes(j.state)), refresh]);
   const needsSync = (job: PublishJob | undefined) => !!state.localSync?.pending && job?.commit_sha === state.localSync.publication_sha;
-  const listingStatus = (d: Draft) => { const job = state.jobs.find(j => j.key === d.key); const base = d.kind === 'series' && !d.published ? '미게시' : d.status; const label = !job || job.state === 'complete' ? base : `${base} · ${jobLabel(job)}`; return label + (needsSync(job) ? ' · 로컬 저장소 동기화 필요' : ''); };
+  const listingStatus = (d: Draft) => { const job = state.jobs.find(j => j.key === d.key); const base = d.kind === 'series' && !d.published ? '미게시' : d.status; const label = !job || ['complete', 'superseded'].includes(job.state) ? base : `${base} · ${jobLabel(job)}`; return label + (needsSync(job) ? ' · 로컬 저장소 동기화 필요' : ''); };
   useEffect(() => { if (menu === 'Categories' && !selected) { const registry = state.drafts.find(d => d.kind === 'categories'); if (registry) setSelected(registry); } }, [menu, selected, state.drafts]);
   const select = (d: Draft) => { setSelected(d); setError(''); };
   const publishedCategories = state.drafts.find(d => d.kind === 'categories')?.published?.data ?? {};
@@ -41,8 +43,8 @@ function App() {
     } catch (e) { setError((e as Error).message); }
   }
   const kind = menu === 'Writing' ? 'post' : menu === 'Series' ? 'series' : menu === 'Pages' ? 'page' : 'categories';
-  return <><header className="cms-header"><a href="/" onClick={e => { e.preventDefault(); navigate(() => { setSelected(null); setMenu('Writing'); void refresh(); }); }}>Mory <small>CMS</small></a><nav aria-label="CMS 메뉴">{['Writing', 'Categories', 'Series', 'Pages'].map(m => <button key={m} aria-current={menu === m ? 'page' : undefined} onClick={() => navigate(() => { setSelected(m === 'Categories' ? state.drafts.find(d => d.kind === 'categories') ?? null : null); setMenu(m); void refresh(); })}>{menuLabels[m]}</button>)}</nav><select aria-label="테마" defaultValue={document.documentElement.dataset.theme} onChange={e => { document.documentElement.dataset.theme = e.target.value; try { localStorage.setItem('mory-cms-theme', e.target.value); } catch {} window.dispatchEvent(new Event('mory-themechange')); }}><option value="light">밝게</option><option value="dark">어둡게</option></select></header>
-  <main className="cms-main">{state.localSync?.pending && <section className="notice" role="status"><p>콘텐츠는 게시되었습니다. 로컬 저장소 동기화가 필요합니다.</p>{state.localSync.error && <p>{state.localSync.error}</p>}<button disabled={syncing} onClick={() => { setSyncing(true); void api<LocalSync | null>('/api/local-sync/retry', 'POST', {}).then(() => refresh()).catch(e => setError(e.message)).finally(() => setSyncing(false)); }}>{syncing ? '동기화 중…' : '다시 동기화'}</button></section>}{error && <p role="alert">! {error}</p>}{selected ? <Editor key={selected.key} navigateGuard={navigateGuard} initial={selected} state={state} refresh={refresh} back={() => { setSelected(null); void refresh(); }} /> : <>
+  return <><header className="cms-header"><a href="/" onClick={e => { e.preventDefault(); navigate(() => { setSelected(null); setMenu('Writing'); void refresh(); }); }}>Mory <small>CMS</small></a><nav aria-label="CMS 메뉴">{Object.keys(menuLabels).map(m => <button key={m} aria-current={menu === m ? 'page' : undefined} onClick={() => navigate(() => { setSelected(m === 'Categories' ? state.drafts.find(d => d.kind === 'categories') ?? null : null); setMenu(m); void refresh(); })}>{menuLabels[m]}</button>)}</nav><select aria-label="테마" defaultValue={document.documentElement.dataset.theme} onChange={e => { document.documentElement.dataset.theme = e.target.value; try { localStorage.setItem('mory-cms-theme', e.target.value); } catch {} window.dispatchEvent(new Event('mory-themechange')); }}><option value="light">밝게</option><option value="dark">어둡게</option></select></header>
+  <main className="cms-main">{state.localSync?.pending && <section className="notice" role="status"><p>콘텐츠는 게시되었습니다. 로컬 저장소 동기화가 필요합니다.</p>{state.localSync.error && <p>{state.localSync.error}</p>}<button disabled={syncing} onClick={() => { setSyncing(true); void api<LocalSync | null>('/api/local-sync/retry', 'POST', {}).then(() => refresh()).catch(e => setError(e.message)).finally(() => setSyncing(false)); }}>{syncing ? '동기화 중…' : '다시 동기화'}</button></section>}{error && <p role="alert">! {error}</p>}{selected ? <Editor key={selected.key} navigateGuard={navigateGuard} initial={selected} state={state} refresh={refresh} back={() => { setSelected(null); void refresh(); }} /> : menu === 'Tips' ? <Tips /> : <>
     <div className="section-heading"><h1>{menuLabels[menu]}</h1>{kind === 'post' || kind === 'series' ? <button onClick={() => void create(kind)}>+ 새 {kind === 'post' ? '글' : '시리즈'}</button> : null}</div>
     {kind === 'post' && <div className="filters"><input aria-label="글 목록 검색" placeholder="제목·설명 검색" value={query} onChange={e => setQuery(e.target.value)} /><select aria-label="상태 필터" value={filter} onChange={e => setFilter(e.target.value)}>{['전체', '초안', '게시됨', '수정 중', '보관됨'].map(s => <option key={s}>{s}</option>)}</select><select aria-label="분류 필터" value={category} onChange={e => setCategory(e.target.value)}><option value="">모든 분류</option>{Object.entries(publishedCategories).map(([id, c]) => <option key={id} value={id}>{(c as any).name}</option>)}</select></div>}
     <ul className="cms-list">{state.drafts.filter(d => d.kind === kind && (kind !== 'post' || ((filter === '전체' || d.status === filter) && (!category || d.value.data.category === category) && `${name(d)} ${d.value.data.description}`.toLowerCase().includes(query.toLowerCase())))).map(d => <li key={d.key}><button onClick={() => select(d)}><strong>{name(d)}</strong><span>{d.kind === 'post' ? publishedCategories[d.value.data.category]?.name ?? '분류 없음' : d.kind === 'series' ? `${d.value.data.posts?.length ?? 0}편` : ''}</span><span>{listingStatus(d)}</span><time>{displayDate(d.updated_at)}</time></button></li>)}</ul>
@@ -102,7 +104,7 @@ function Editor({ initial, state, refresh, back, navigateGuard }: { navigateGuar
         const next = await api<PublishJob>(`/api/jobs/${job.id}`); if (!live) return;
         if (next.state !== 'publishing') {
           if (autosave.generation === autosave.savedGeneration) {
-            try { const row = await api<Draft>(`/api/drafts/${initial.key}`); if (live && autosave.generation === autosave.savedGeneration && row.revision !== autosave.revision) { autosave.draft = row; autosave.value = row.value; autosave.revision = row.revision; autosave.savedAt = row.saved_at; rerender(n => n + 1); } } catch { if (next.state === 'complete' || next.state === 'deploying') { back(); } }
+            try { const row = await api<Draft>(`/api/drafts/${initial.key}`); if (live && autosave.generation === autosave.savedGeneration && row.revision !== autosave.revision) { autosave.draft = row; autosave.value = row.value; autosave.revision = row.revision; autosave.savedAt = row.saved_at; rerender(n => n + 1); } } catch { if (['complete', 'superseded', 'deploying'].includes(next.state)) { back(); } }
           }
           if (live) setLocked(false);
           void refresh();
@@ -135,7 +137,7 @@ function Editor({ initial, state, refresh, back, navigateGuard }: { navigateGuar
     {autosave.state === 'conflict' && <section className="notice"><p>다른 창이나 기기에서 저장한 서버 최신본이 있습니다. 현재 입력은 이 창에 보존됩니다.</p><button onClick={() => void reload()}>서버 최신본 불러오기</button></section>}
     {autosave.failed && autosave.state === 'unsaved' && !locked && <button onClick={() => void autosave.flush().catch(e => setError((e as Error).message))}>자동저장 다시 시도</button>}
     {autosave.failed && autosave.state === 'unsaved' && !locked && <button onClick={() => void reload()}>서버 저장본 불러오기</button>}
-    {job && <p className="publish-status" role="status">{jobLabel(job)}{['publishing', 'deploying'].includes(job.state) ? '…' : ''}{(job.state === 'deploying' || job.state === 'complete') && (dirty || autosave.draft.status === '수정 중') ? ' · 미게시 변경 있음' : ''}{job.error && ` · ${job.error.replace(/^배포 실패\.\s*/, '')}`}{state.localSync?.pending && job.commit_sha === state.localSync.publication_sha ? ' · 로컬 저장소 동기화 필요' : ''}</p>}
+    {job && <p className="publish-status" role="status">{jobLabel(job)}{['publishing', 'deploying'].includes(job.state) ? '…' : ''}{['deploying', 'complete', 'superseded'].includes(job.state) && (dirty || autosave.draft.status === '수정 중') ? ' · 미게시 변경 있음' : ''}{job.error && ` · ${job.error.replace(/^배포 실패\.\s*/, '')}`}{state.localSync?.pending && job.commit_sha === state.localSync.publication_sha ? ' · 로컬 저장소 동기화 필요' : ''}</p>}
     {job?.state === 'failed' && job.pushed_at && (state.canRetryDeployment ? <button onClick={() => void api<PublishJob>(`/api/jobs/${job.id}/retry`, 'POST', {}).then(setJob).catch(e => setError(e.message))}>배포 다시 시도</button> : job.run_url && <p><a href={job.run_url} target="_blank" rel="noopener noreferrer">GitHub에서 배포 확인·재시도 →</a></p>)}
     {job?.state === 'conflict' && <button onClick={() => { if (confirm('현재 입력은 복구 사본으로 남기고 외부에서 변경된 공개본을 불러올까요?')) void reload(true); }}>공개본 다시 불러오기</button>}
     <fieldset disabled={locked || !!recovery}>

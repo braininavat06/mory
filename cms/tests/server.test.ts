@@ -112,8 +112,9 @@ test('many-to-many series, isolated series snapshots, deletion cleanup and Pages
    await publish(f,a);await publish(f,b);assert.equal(publicSeries(readContent(f.publisher.repo)).filter(s=>s.posts.some(p=>p.data.id===post.id)).length,2);
    a=modify(f.store,f.store.get(a.key),{name:'A 미게시'});b=modify(f.store,f.store.get(b.key),{name:'B 공개'});await publish(f,b);
    assert.equal(readContent(f.publisher.repo).series['series-a'].name,'A');
-   const page=f.store.get('page:home');const next=modify(f.store,page,{},'# 홈\n\n::recent-writing{count=2}\n\n::category-list\n\n::series-list\n\n::writing-search\n\n::writing-list');
-   const preview=await renderPreview(f.store,page.key,next.value,'light');assert.match(preview,/<mory-search/);assert.match(preview,/series-a/);
+   const page=f.store.get('page:home');const next=modify(f.store,page,{},'# 홈\n\n::recent-writing{count=2}\n\n::category-list\n\n::series-list\n\n::series-writing{id=series-a}\n\n::writing-search\n\n::writing-list');
+   const preview=await renderPreview(f.store,page.key,next.value,'light');assert.match(preview,/<mory-search/);assert.match(preview,/series-a/);assert.match(preview,/class="series-writing"/);
+   const postPreview=await renderPreview(f.store,post.key,{...post.value,body:'## 시리즈 안내\n\n::series-writing{id=series-a}'},'dark');assert.match(postPreview,/class="series-writing"/);assert.match(postPreview,/href="\/writing\/series-post\/"/);
    await publish(f,next); assert.equal(f.store.get(page.key).status,'게시됨');
    const about=modify(f.store,f.store.get('page:about'),{title:'소개'},'# 소개 수정');await publish(f,about);assert.equal(readContent(f.publisher.repo).pages.find(p=>p.key==='about')!.body,'# 소개 수정');
    await publish(f,post,'archive');post=f.store.get(post.key);assert.equal((await publish(f,post,'delete')).state,'deploying');
@@ -150,12 +151,39 @@ test('Seoul timestamps and offset instant order are host-timezone independent',(
 });
 test('GitHub status is matched to SHA and workflow; API outage never declares completion',async()=>{
  const original=globalThis.fetch;
- try{globalThis.fetch=async(input,options)=>{assert.match(String(input),/workflows\/deploy.yml\/runs\?head_sha=abc/);assert.ok(!(options?.headers as any).Authorization);return new Response(JSON.stringify({workflow_runs:[{head_sha:'other',status:'completed',conclusion:'success',run_attempt:1},{head_sha:'abc',status:'completed',conclusion:'failure',html_url:'https://github.com/run',run_attempt:1}]}));};
+ try{globalThis.fetch=async(input,options)=>{assert.ok(!(options?.headers as any).Authorization);if(String(input).includes('status=success')) {assert.match(String(input),/branch=main/);return new Response(JSON.stringify({workflow_runs:[]}));}assert.match(String(input),/workflows\/deploy.yml\/runs\?head_sha=abc/);return new Response(JSON.stringify({workflow_runs:[{head_sha:'other',status:'completed',conclusion:'success',run_attempt:1},{head_sha:'abc',status:'completed',conclusion:'failure',html_url:'https://github.com/run',run_attempt:1}]}));};
  assert.equal((await githubDeployment('git@github.com:braininavat06/mory.git')('abc')).state,'failed');
  globalThis.fetch=async()=>new Response('',{status:403});await assert.rejects(githubDeployment('git@github.com:braininavat06/mory.git')('abc'));
  }finally{globalThis.fetch=original;}
 });
 
+test('a successful descendant deployment resolves historical failures; unrelated success and API outage do not',async()=>{
+ const original=globalThis.fetch;
+ try {
+  for(const status of ['ahead','behind','diverged']) {
+   globalThis.fetch=async(input)=>{
+    const url=String(input);
+    if(url.includes('/compare/'))return new Response(JSON.stringify({status,merge_base_commit:{sha:status==='ahead'?'old':'other'}}));
+    const latest=url.includes('status=success');
+    return new Response(JSON.stringify({workflow_runs:[{head_sha:latest?'new':'old',status:'completed',conclusion:latest?'success':'failure',html_url:latest?'https://github.com/new':'https://github.com/old',run_attempt:1}]}));
+   };
+   const result=await githubDeployment('git@github.com:braininavat06/mory.git')('old');
+   assert.equal(result.state,status==='ahead'?'superseded':'failed');assert.equal(result.url,status==='ahead'?'https://github.com/new':'https://github.com/old');
+  }
+  globalThis.fetch=async(input)=>String(input).includes('/compare/')?new Response('',{status:403}):new Response(JSON.stringify({workflow_runs:[{head_sha:String(input).includes('status=success')?'new':'old',status:'completed',conclusion:String(input).includes('status=success')?'success':'failure',run_attempt:1}]}));
+  await assert.rejects(githubDeployment('git@github.com:braininavat06/mory.git')('old'));
+ } finally {globalThis.fetch=original;}
+});
+test('historical deployment failure resolves without republishing drafts or rerunning the obsolete workflow',async()=>{
+ const f=setup();try {
+  const d=modify(f.store,f.store.create('post'),{title:'이전 배포',slug:'historical'},'내용');const job=await publish(f,d);
+  f.store.updateJob(job.id,{state:'failed',run_url:'https://github.com/old',error:'이전 실패'});
+  const before=f.store.get(d.key);f.publisher.options.deployment=async()=>({state:'superseded',url:'https://github.com/new'});
+  let retries=0;f.publisher.options.retryDeployment=async()=>{retries++;};
+  assert.equal((await f.publisher.retryDeployment(job.id)).state,'superseded');assert.equal(retries,0);
+  assert.deepEqual(f.store.get(d.key),before);assert.equal(f.store.job(job.id).error,null);assert.equal(f.store.job(job.id).run_url,'https://github.com/new');
+ }finally{f.cleanup();}
+});
 test('uncertain push acknowledgement and restart recover the same commit without duplicate publication',async()=>{
  const f=setup();try{
  let d=modify(f.store,f.store.create('post'),{title:'응답 단절',slug:'lost-response'},'내용');
@@ -187,6 +215,7 @@ test('backup keeps seven daily and bounded weekly snapshots; no partial snapshot
 test('failed deployment retry reuses its job, requires server authority and never creates a content commit', async () => {
   const f=setup(); try {
     const d=modify(f.store,f.store.create('post'),{title:'배포 재시도',slug:'deploy-retry'},'내용');const job=await publish(f,d);
+    f.deployed('failed');
     f.store.updateJob(job.id,{state:'failed',run_url:'https://github.com/braininavat06/mory/actions/runs/123',error:'배포 실패'});
     const origin='http://127.0.0.1:40009',app=createApp(f.store,f.publisher,origin);
     const state=async()=> (await app.request(origin+'/api/state',{headers:{host:'127.0.0.1:40009'}})).json();

@@ -8,6 +8,10 @@
 .cms-header select { background: transparent; border: 0; }
 .cms-main { max-width: 1440px; margin: 36px auto; padding: 0 32px; }
 .cms-main h1 { font-size: 2rem; }
+.cms-tips { max-width: 820px; }
+.cms-tips section { margin-block: 40px; }
+.cms-tips pre { background: var(--surface-raised); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cms-tips code { overflow-wrap: anywhere; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .filters { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 24px; }
 .filters input { flex: 1; }

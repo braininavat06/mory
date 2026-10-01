@@ -43,6 +43,37 @@ test('all five dynamic blocks work in pages and only count is supported', async 
 });
 
 
+test('series-writing works in posts and pages, preserves complete series order and excludes private/outside posts', async () => {
+  const fixture = fixtureContent();
+  const extra = Array.from({ length: 23 }, (_, i) => ({ file: `src/content/posts/series-${i}.md`, body: '', data: { ...fixture.posts[0].data, id: `01K6F4J0M000000000000000${String(i + 10).padStart(3, '0')}`, slug: `series-${i}`, title: `시리즈 ${i}`, aliases: [] } }));
+  fixture.posts.push(...extra);
+  fixture.series['sample-series'].name = '이름 <변경>';
+  fixture.series['sample-series'].posts = [fixture.posts[1].data.id, ...extra.map(p => p.data.id).reverse(), fixture.posts[2].data.id, fixture.posts[3].data.id];
+  const options = createMarkdownOptions(fixture);
+  const custom = await options.processor.createRenderer(options);
+  const expected = ['markdown-notes', ...extra.map(p => p.data.slug).reverse()];
+  for (const location of [pageOptions, { fileURL: pathToFileURL(resolve(fixture.posts[0].file)), frontmatter: fixture.posts[0].data }]) {
+    const { code } = await custom.render('::series-writing{id=sample-series}', location);
+    assert.match(code, /이름 (?:&lt;|&#x3C;)변경(?:&gt;|>)/);
+    assert.doesNotMatch(code, /<변경>/);
+    assert.match(code, /data-pagefind-ignore/);
+    assert.deepEqual([...code.matchAll(/<h2><a href="\/writing\/([^/]+)\/">/g)].map(m => m[1]), expected);
+    assert.doesNotMatch(code, /draft-example|archived-example|a-place-to-write/);
+  }
+});
+test('series-writing validates IDs/options, handles empty public series, and stays literal inside code', async () => {
+  for (const invalid of ['::series-writing', '::series-writing{id=missing}', '::series-writing{id=sample-series,count=2}', '::series-writing{id=../bad}']) {
+    await assert.rejects(renderer.render(invalid, pageOptions), error => /시리즈/.test(String(error)) && (error as { ruleId: string }).ruleId === 'dynamic-block');
+  }
+  await assert.rejects(renderer.render('::writing-list', options), /Pages/);
+  const { code: literal } = await renderer.render('`::series-writing{id=missing}`\n\n```text\n::series-writing{id=missing}\n```', options);
+  assert.doesNotMatch(literal, /class="series-writing"/);
+  const fixture = fixtureContent(); fixture.series['sample-series'].posts = [fixture.posts[2].data.id, fixture.posts[3].data.id];
+  const config = createMarkdownOptions(fixture), custom = await config.processor.createRenderer(config);
+  const { code } = await custom.render('::series-writing{id=sample-series}', pageOptions);
+  assert.match(code, /샘플 시리즈/); assert.match(code, /아직 공개된 글이 없습니다/);
+  assert.doesNotMatch(code, /href="\/series\/sample-series\/"|\/writing\//);
+});
 test('build pre-validation makes Markdown errors fatal with the filename', async () => {
   const fixture = fixtureContent();
   fixture.posts[0].body = '[[missing-build-reference]]';

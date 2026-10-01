@@ -10,7 +10,7 @@ export type Action = 'publish' | 'archive' | 'restore' | 'delete';
 export interface LocalSync { pending: boolean; remote_sha: string; publication_sha: string; error: string | null; last_attempt_at: string }
 export interface PublishJob {
   id: string; key: string; revision: number; action: Action; snapshot: Payload;
-  state: 'publishing' | 'deploying' | 'complete' | 'failed' | 'conflict';
+  state: 'publishing' | 'deploying' | 'complete' | 'superseded' | 'failed' | 'conflict';
   pushed_at: string | null; commit_sha: string | null; error: string | null; run_url: string | null;
   started_at: string; updated_at: string;
 }

@@ -12,11 +12,12 @@ import { gitOutput } from './git.ts';
 import { DevSync, remoteIdentity } from './dev-sync.ts';
 import { managedContent } from './content-paths.ts';
 import { CONTENT_CONTRACT_VERSION } from '../../src/lib/content-contract.ts';
-export interface PublisherOptions { remote: string; deploymentIntervalMs?: number; branch?: string; author?: string; email?: string; retryDeployment?: (url: string) => Promise<void>; deployment?: (sha: string) => Promise<{ state: 'deploying' | 'complete' | 'failed'; url?: string; error?: string }> }
+export interface PublisherOptions { remote: string; deploymentIntervalMs?: number; branch?: string; author?: string; email?: string; retryDeployment?: (url: string) => Promise<void>; deployment?: (sha: string) => Promise<{ state: 'deploying' | 'complete' | 'superseded' | 'failed'; url?: string; error?: string }> }
 export class Publisher {
   private queue: Promise<void> = Promise.resolve();
   private lastChecked = new Map<string, number>();
   private checking = new Set<string>();
+  private retrying = new Map<string, Promise<PublishJob>>();
   private running = new Set<string>();
   repo: string;
   dev: DevSync;
@@ -98,6 +99,7 @@ export class Publisher {
     const marker = await this.git(['ls-tree', '--name-only', sha, '--', 'src/lib/content-contract.ts'], cwd);
     const source = marker ? await this.git(['show', `${sha}:src/lib/content-contract.ts`], cwd) : '';
     const version = marker ? Number(/^export const CONTENT_CONTRACT_VERSION = (\d+);$/m.exec(source)?.[1]) : 1;
+    if (version < CONTENT_CONTRACT_VERSION) throw new CmsError(400, '새 문법을 지원하는 사이트 업데이트가 먼저 필요합니다. 작업본은 유지됩니다.');
     if (version !== CONTENT_CONTRACT_VERSION) throw new CmsError(400, '실행 중인 CMS가 최신 콘텐츠 구조를 지원하지 않습니다. CMS를 업데이트하고 직접 재시작한 뒤 다시 게시해 주세요.');
     const ignore = await this.git(['show', `${sha}:.gitignore`], cwd);
     if (!/^\/runtime\/\r?$/m.test(ignore)) throw new CmsError(400, '최신 코드에서도 runtime 전체가 Git에서 제외되어야 합니다. 원격 .gitignore 설정을 확인해 주세요.');
@@ -263,18 +265,29 @@ export class Publisher {
   }
   async deployment(id: string): Promise<PublishJob> {
     let job = this.store.job(id);
-    if (job.state !== 'deploying' || !job.commit_sha) return job;
+    if (!(job.state === 'deploying' || (job.state === 'failed' && job.pushed_at)) || !job.commit_sha) return job;
     if (this.checking.has(id) || Date.now() - (this.lastChecked.get(id) ?? 0) < (this.options.deploymentIntervalMs ?? 0)) return job;
     this.checking.add(id); this.lastChecked.set(id, Date.now());
     try {
       const result = await this.options.deployment?.(job.commit_sha);
-      if (result) this.store.updateJob(id, { state: result.state, run_url: result.url ?? null, error: result.error ?? null });
-    } catch { this.store.updateJob(id, { error: '배포 상태를 확인하지 못했습니다. 완료 여부를 계속 확인합니다.' }); }
+      if (result) this.store.updateJob(id, { state: result.state, run_url: result.url ?? job.run_url, error: result.error ?? null });
+    } catch { if (job.state === 'deploying') this.store.updateJob(id, { error: '배포 상태를 확인하지 못했습니다. 완료 여부를 계속 확인합니다.' }); }
     this.checking.delete(id);
     return this.store.job(id);
   }
   async retryDeployment(id: string): Promise<PublishJob> {
-    const job = this.store.job(id);
+    const existing = this.retrying.get(id);
+    if (existing) return existing;
+    const task = this.retryCheckedDeployment(id);
+    this.retrying.set(id, task);
+    void task.then(() => this.retrying.delete(id), () => this.retrying.delete(id));
+    return task;
+  }
+  private async retryCheckedDeployment(id: string): Promise<PublishJob> {
+    if (this.checking.has(id)) throw new CmsError(423, '배포 상태를 확인하고 있습니다. 잠시 후 다시 확인해 주세요.');
+    this.lastChecked.delete(id);
+    const job = await this.deployment(id);
+    if (job.state === 'complete' || job.state === 'superseded') return job;
     if (job.state === 'deploying') return job;
     if (job.state !== 'failed' || !job.pushed_at || !job.run_url) throw new CmsError(400, '다시 실행할 배포를 찾지 못했습니다.');
     if (!this.options.retryDeployment) throw new CmsError(400, '배포 재시도에는 서버의 GitHub 권한 설정이 필요합니다.');
@@ -294,9 +307,9 @@ export function githubRetry(token: string | undefined) {
     if (!response.ok) throw new Error('Deployment retry failed');
   };
 }
-export function githubDeployment(remote: string, token?: string, workflow = 'deploy.yml') {
+export function githubDeployment(remote: string, token?: string, workflow = 'deploy.yml', branch = 'main') {
   const repository = /github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/.exec(remote)?.[1];
-  return async (sha: string): Promise<{ state: 'deploying' | 'complete' | 'failed'; url?: string; error?: string }> => {
+  return async (sha: string): Promise<{ state: 'deploying' | 'complete' | 'superseded' | 'failed'; url?: string; error?: string }> => {
     if (!repository) return { state: 'deploying', error: '배포 상태 확인을 지원하지 않는 저장소입니다. 게시 완료 여부를 별도로 확인하세요.' };
     const response = await fetch(`https://api.github.com/repos/${repository}/actions/workflows/${encodeURIComponent(workflow)}/runs?head_sha=${sha}&event=push&per_page=10`, {
       headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Mory-CMS', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, signal: AbortSignal.timeout(15_000),
@@ -304,6 +317,20 @@ export function githubDeployment(remote: string, token?: string, workflow = 'dep
     if (!response.ok) throw new Error('Deployment API unavailable');
     const data = await response.json() as { workflow_runs: { head_sha: string; status: string; conclusion: string | null; html_url: string; run_attempt: number }[] };
     const run = data.workflow_runs.filter(r => r.head_sha === sha).sort((a, b) => b.run_attempt - a.run_attempt)[0];
+    if (!run || (run.status === 'completed' && run.conclusion !== 'success')) {
+      const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'Mory-CMS', ...(token ? { Authorization: 'Bearer ' + token } : {}) };
+      const latestResponse = await fetch('https://api.github.com/repos/' + repository + '/actions/workflows/' + encodeURIComponent(workflow) + '/runs?branch=' + encodeURIComponent(branch) + '&status=success&per_page=1', { headers, signal: AbortSignal.timeout(15_000) });
+      if (!latestResponse.ok) throw new Error('Deployment API unavailable');
+      const latestData = await latestResponse.json() as typeof data;
+      const latest = latestData.workflow_runs.find(r => r.status === 'completed' && r.conclusion === 'success');
+      if (latest) {
+        if (latest.head_sha === sha) return { state: 'complete', url: latest.html_url };
+        const compared = await fetch('https://api.github.com/repos/' + repository + '/compare/' + encodeURIComponent(sha) + '...' + encodeURIComponent(latest.head_sha), { headers, signal: AbortSignal.timeout(15_000) });
+        if (!compared.ok) throw new Error('Commit ancestry unavailable');
+        const ancestry = await compared.json() as { status: string; merge_base_commit: { sha: string } };
+        if (ancestry.status === 'ahead' && ancestry.merge_base_commit?.sha === sha) return { state: 'superseded', url: latest.html_url };
+      }
+    }
     if (!run) return { state: 'deploying' };
     return { state: run.status !== 'completed' ? 'deploying' : run.conclusion === 'success' ? 'complete' : 'failed', url: run.html_url, error: run.status === 'completed' && run.conclusion !== 'success' ? '작업본은 보존되어 있습니다. GitHub에서 실패 원인을 확인하세요.' : undefined };
   };

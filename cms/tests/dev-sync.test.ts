@@ -9,6 +9,7 @@ import { Publisher } from '../server/publish.ts';
 import { remoteIdentity } from '../server/dev-sync.ts';
 import { createApp } from '../server/app.ts';
 import { writeFixtureContent } from '../../tests/fixtures.ts';
+import { CONTENT_CONTRACT_VERSION } from '../../src/lib/content-contract.ts';
 const git = (cwd: string, args: string[]) => execFileSync('git', ['-c','user.name=Test','-c','user.email=test@example.invalid', ...args], { cwd, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }).trim();
 function setup() {
   const temp = mkdtempSync(join(tmpdir(), 'mory-sync-')), root = join(temp, 'dev'), remote = join(temp,'remote.git'), other = join(temp,'other');
@@ -152,10 +153,12 @@ test('ignored local files and remote runtime tracking/ignore removal are rejecte
  }
 });
 test('runtime compatibility is checked from the fetched commit, not updated files on disk',async()=>{
- const f=setup();try{
-  advance(f,'src/lib/content-contract.ts','export const CONTENT_CONTRACT_VERSION = 2;\n');const head=git(f.root,['rev-parse','HEAD']);
-  const job=await publish(f);assert.equal(job.state,'failed');assert.match(job.error!,/실행 중인 CMS.*지원하지/);assert.equal(git(f.root,['rev-parse','HEAD']),head);
- }finally{f.close();}
+ for(const version of [CONTENT_CONTRACT_VERSION+1,CONTENT_CONTRACT_VERSION-1]) {
+  const f=setup();try{
+   advance(f,'src/lib/content-contract.ts','export const CONTENT_CONTRACT_VERSION = '+version+';\n');const head=git(f.root,['rev-parse','HEAD']);
+   const job=await publish(f);assert.equal(job.state,'failed');assert.match(job.error!,version>CONTENT_CONTRACT_VERSION?/실행 중인 CMS.*지원하지/:/사이트 업데이트/);assert.equal(git(f.root,['rev-parse','HEAD']),head);
+  }finally{f.close();}
+ }
 });
 test('a code push racing after preflight is fetched, revalidated and retried without duplicate content commits',async()=>{
  const f=setup();try{

@@ -108,6 +108,8 @@ GitHub의 deploy.yml workflow에서 해당 SHA/push event를 조회합니다. pu
 
 서버에 배포 재시도 인증이 설정되지 않았다면 재시도 버튼 대신 해당 GitHub Actions 실행 링크를 표시합니다. API는 재시도 가능 여부만 전달하며 credential은 전달하지 않습니다. CMS 통합 테스트의 Markdown/YAML은 `tests/fixtures.ts`에서 임시 저장소에 생성하므로 실제 글의 보관·삭제·분류 변경에 영향을 받지 않습니다.
 
+과거 배포 실패는 화면을 불러올 때 다시 확인합니다. 동일 workflow와 게시 branch의 최신 성공 배포가 해당 게시 커밋을 포함한다는 GitHub compare 결과를 확인하면 `후속 배포 완료`로 정리합니다. 실패 실행 자체를 성공으로 바꾸거나 기록을 삭제하지 않습니다. 재시도 전에도 확인하며, 이미 후속 배포가 완료됐으면 오래된 workflow를 재실행하지 않습니다. 원격 push 실패, 포함되지 않은 커밋, 확인할 수 없는 API 응답은 자동으로 정리하지 않습니다.
+
 게시 자체의 validation/통신 실패와 실제 배포 실패를 구분합니다. 공개 파일이 base hash와 다르면 중단합니다. 자동 merge는 없습니다. 새 글 또는 아직 Git에 없는 시리즈를 먼저 참조하는 시리즈 게시에는 공유 validator의 없는 post ID 오류가 날 수 있습니다. 해당 글부터 게시하세요. 영구 삭제할 글을 다른 글의 wikilink가 참조하면 먼저 그 링크를 수정해야 validation을 통과합니다.
 
 ## 분류·시리즈·페이지·보관
@@ -117,6 +119,8 @@ GitHub의 deploy.yml workflow에서 해당 SHA/push event를 조회합니다. pu
 시리즈는 개별 YAML과 개별 SQLite row를 사용합니다. 이름/설명/ULID 배열을 편집하고 여러 글 선택, drag & drop 또는 mobile 위/아래 버튼으로 순서를 바꿉니다. 동일 글의 여러 시리즈 소속을 허용합니다. 시리즈 삭제는 post를 삭제하지 않습니다. 기존 sample-series의 URL/ID/순서를 유지하여 중앙 파일을 이동했습니다. description 기본은 빈 문자열입니다.
 
 Home/About는 같은 CodeMirror/저장/복구/preview/publish를 사용하며 보관·삭제는 없습니다. 모든 dynamic block을 공유 파이프라인으로 렌더링합니다. preview는 공용 remark/Shiki/KaTeX와 public CSS·검색·TOC JS를 사용합니다. CMS 화면을 보호하기 위해 renderer 결과에서 script/event handler/위험 iframe 등을 제거하며 정상 지원 Markdown 문법을 유지합니다. preview의 다른 페이지 링크는 이동시키지 않고 heading 이동은 작동합니다. Pagefind는 로컬 `dist/pagefind`를 사용하며 index가 없으면 공용 fallback을 표시합니다.
+
+`::series-writing{id=시리즈-ID}`는 Home/About와 글 본문에 모두 사용할 수 있습니다. 제목은 registry에서 가져오며 공개 글 전체를 시리즈 배열 순서대로 표시하고, 초안·보관 글은 제외합니다. 페이지네이션은 없고 없는 ID는 게시 검증 오류입니다. 미게시 Series는 먼저 게시해야 합니다. Site/CMS 공용 renderer를 사용하며 이 문법을 추가한 content contract는 버전 2입니다. 코드 배포 전 새 CMS가 구버전 사이트에 콘텐츠를 게시하거나, 구버전 CMS가 최신 문법을 잘못 처리하는 것을 호환성 검사로 차단합니다.
 
 글은 보관 후에만 영구 삭제합니다. 삭제는 글 파일 제거 + 모든 공개 Series의 ULID 제거를 한 게시 작업으로 처리합니다. 미게시 Series 작업본에서도 그 ULID만 제거하여 나머지 변경을 유지합니다. Git에 없는 초안의 보관·복원·삭제는 SQLite 안에서 끝납니다. R2 자산은 삭제하지 않습니다.
 

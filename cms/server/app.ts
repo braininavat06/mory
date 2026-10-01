@@ -31,7 +31,7 @@ export function createApp(store: Store, publisher: Publisher, origin: string) {
   });
   app.get('/api/health', c => c.json({ service: 'mory-cms', ok: true }));
   app.get('/api/state', async c => {
-    await Promise.all(store.jobs().filter(j => j.state === 'deploying').map(j => publisher.deployment(j.id)));
+    await Promise.all(store.jobs().filter(j => j.state === 'deploying' || (j.state === 'failed' && j.pushed_at)).map(j => publisher.deployment(j.id)));
     return c.json({ drafts: store.list(), jobs: store.jobs().map(({ snapshot: _, ...job }) => job), localSync: store.localSync(), canRetryDeployment: !!publisher.options.retryDeployment });
   });
   app.post('/api/local-sync/retry', async c => { await c.req.json(); return c.json(await publisher.retryLocalSync()); });

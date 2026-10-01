@@ -88,12 +88,14 @@ aliases:
 
 ::series-list
 
+::series-writing{id=sample-series}
+
 ::writing-search
 
 ::writing-list
 ```
 
-각 문법은 독립된 paragraph로 작성합니다. `recent-writing`의 양의 정수 `count`만 옵션으로 지원합니다. `writing-list`는 전체 공개 글을 최신순으로 삽입합니다. Writing/Category 경로의 목록은 별도로 페이지네이션됩니다.
+각 문법은 독립된 paragraph로 작성합니다. `recent-writing`은 양의 정수 `count`, `series-writing`은 고정 시리즈 `id`를 사용하며 다른 옵션은 지원하지 않습니다. `series-writing`은 글 본문에서도 사용할 수 있고, 시리즈 제목과 공개 글 전체를 registry 순서대로 표시합니다. 페이지네이션은 없으며 없는 ID는 검증 오류입니다. 시리즈 블록은 Pagefind 본문 검색에서 제외합니다. `writing-list`는 전체 공개 글을 최신순으로 삽입합니다. Writing/Category 경로의 목록은 별도로 페이지네이션됩니다.
 
 ## Category / Series
 

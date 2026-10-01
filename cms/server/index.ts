@@ -19,7 +19,7 @@ if (existsSync(lock)) {
 writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 });
 const configuredRemote = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: root, encoding: 'utf8' }).trim();
 const remote = process.env.MORY_PUBLISH_REMOTE ?? configuredRemote.replace(/^https:\/\/github.com\//, 'git@github.com:');
-const publisher = new Publisher(store, { remote, deploymentIntervalMs: process.env.MORY_GITHUB_TOKEN ? 15_000 : 60_000, branch: process.env.MORY_PUBLISH_BRANCH, author: process.env.MORY_GIT_NAME, email: process.env.MORY_GIT_EMAIL, deployment: githubDeployment(remote, process.env.MORY_GITHUB_TOKEN), retryDeployment: githubRetry(process.env.MORY_GITHUB_TOKEN) });
+const publisher = new Publisher(store, { remote, deploymentIntervalMs: process.env.MORY_GITHUB_TOKEN ? 15_000 : 60_000, branch: process.env.MORY_PUBLISH_BRANCH, author: process.env.MORY_GIT_NAME, email: process.env.MORY_GIT_EMAIL, deployment: githubDeployment(remote, process.env.MORY_GITHUB_TOKEN, 'deploy.yml', process.env.MORY_PUBLISH_BRANCH ?? 'main'), retryDeployment: githubRetry(process.env.MORY_GITHUB_TOKEN) });
 publisher.resume();
 const server = serve({ fetch: createApp(store, publisher, origin).fetch, hostname: '127.0.0.1', port }, () => console.log(`Mory CMS: ${origin}`));
 let backingUp = false;
