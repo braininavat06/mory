@@ -49,11 +49,12 @@ h3 { font-size: 1.2rem; }
 .site-header { display: flex; align-items: center; gap: 32px; padding-block: 28px; border-bottom: 1px solid var(--line); }
 .wordmark { font-size: 1.8rem; font-weight: 750; letter-spacing: -.075em; text-decoration: none; line-height: 1; margin-right: auto; }
 .wordmark span { color: var(--accent); }
-.site-header nav { display: flex; align-items: center; gap: 26px; }
-.site-header nav a, .site-header nav button { text-decoration: none; font-size: .9rem; min-height: 44px; display: inline-flex; align-items: center; border: 0; padding: 0; }
+.site-header nav { display: flex; align-items: center; gap: 14px; }
+.site-header nav a, .site-header nav button { text-decoration: none; font-size: .9rem; min-width: 52px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; padding: 8px 12px; }
 .site-header nav [aria-current] { text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--accent); }
 .theme-control select { background: transparent; font-size: .8rem; border: 0; padding-inline: .25rem; max-width: 95px; }
 .site-footer { display: flex; justify-content: space-between; gap: 20px; padding-block: 26px; border-top: 1px solid var(--line); margin-top: 88px; color: var(--muted); font-size: .8rem; }
+.site-footer [data-open-rss] { display: inline-flex; align-items: center; min-height: 44px; }
 .page-content, .listing-content { max-width: 780px; margin: 72px auto 0; padding-inline: 30px; }
 .home-content { margin-top: 92px; }
 .home-content > h1 { max-width: 680px; font-weight: 600; margin-bottom: 28px; }
@@ -160,8 +161,11 @@ mory-search input { width: 100%; }
 .search-results li { padding: 18px 0; border-bottom: 1px solid var(--line); }
 .search-results h3 { margin: 0 0 8px; font-size: 1.05rem; }
 .search-results p { margin: 0; font-size: .9rem; color: var(--muted); }
-.search-dialog { width: min(700px, calc(100vw - 32px)); max-height: 82vh; padding: 30px; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
-.search-dialog::backdrop { background: rgb(0 0 0 / .45); }
+.search-dialog, .rss-dialog { width: min(700px, calc(100vw - 32px)); max-height: 82vh; padding: 30px; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+.search-dialog::backdrop, .rss-dialog::backdrop { background: rgb(0 0 0 / .45); }
+.rss-address { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.rss-address input { flex: 1 1 220px; max-width: 100%; }
+.rss-copy-status { min-height: 1.7em; font-size: .9rem; color: var(--muted); }
 .dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .dialog-header h2 { margin: 0; font-size: 1.2rem; }
 .dialog-header button { font-size: .85rem; }
@@ -181,10 +185,10 @@ mory-search input { width: 100%; }
   .post-afterword { grid-row: 4; }
 }
 @media (max-width: 600px) {
-  .site-header { padding: 20px; gap: 14px; flex-wrap: wrap; }
+  .site-header { padding: 20px; gap: 8px; flex-wrap: wrap; }
   .wordmark { font-size: 1.65rem; }
-  .site-header nav { gap: 18px; }
-  .site-header nav a, .site-header nav button { font-size: .8rem; }
+  .site-header nav { gap: 8px; }
+  .site-header nav a, .site-header nav button { font-size: .8rem; min-width: 48px; padding-inline: 8px; }
   .theme-control select { font-size: .72rem; }
   .page-content, .listing-content, .post-grid { padding-inline: 22px; margin-top: 44px; }
   .home-content { margin-top: 58px; }
@@ -198,6 +202,6 @@ mory-search input { width: 100%; }
   mory-search input { font-size: 1rem; }
   .toc a { min-height: 44px; align-content: center; }
   .toc li { margin-block: 2px; }
-  .search-dialog { padding: 20px; }
+  .search-dialog, .rss-dialog { padding: 20px; }
   .series-navigation { padding: 20px; }
 }

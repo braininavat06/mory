@@ -42,14 +42,23 @@ const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.path
   <header class="site-header" data-pagefind-ignore>
     <a class="wordmark" href="/" aria-label="Mory 홈">Mory<span aria-hidden="true">.</span></a>
     <nav aria-label="주 메뉴">
-      <a href="/writing/" aria-current={writingActive ? 'page' : undefined}>글</a>
       <a href="/about/" aria-current={Astro.url.pathname === '/about/' ? 'page' : undefined}>소개</a>
+      <a href="/writing/" aria-current={writingActive ? 'page' : undefined}>글</a>
       <button type="button" data-open-search aria-haspopup="dialog">검색</button>
     </nav>
     <label class="theme-control"><span class="visually-hidden">테마</span><select name="theme" aria-label="테마 선택" data-theme-select><option value="system">시스템</option><option value="light">밝게</option><option value="dark">어둡게</option></select></label>
   </header>
   <main id="main" tabindex="-1"><slot /></main>
-  <footer class="site-footer" data-pagefind-ignore><span>Mory — 개인 홈페이지와 글 아카이브</span><a href="/rss.xml">RSS</a></footer>
+  <footer class="site-footer" data-pagefind-ignore><span>Mory — 개인 홈페이지와 글 아카이브</span><a href="/rss.xml" data-open-rss aria-haspopup="dialog">RSS 구독</a></footer>
+  <dialog class="rss-dialog" aria-labelledby="rss-dialog-title" data-rss-dialog data-pagefind-ignore>
+    <div class="dialog-header"><h2 id="rss-dialog-title">RSS 구독</h2><button type="button" data-close-rss aria-label="RSS 안내 닫기">닫기 ×</button></div>
+    <p>RSS 리더 앱에 이 주소를 등록하면 Mory의 새 글을 모아 볼 수 있습니다.</p>
+    <label for="rss-address">구독 주소</label>
+    <div class="rss-address"><input id="rss-address" type="text" value={new URL('/rss.xml', SITE).href} readonly /><button type="button" data-copy-rss>주소 복사</button></div>
+    <p class="rss-copy-status" role="status" aria-live="polite" data-rss-copy-status></p>
+    <ol><li>구독 주소를 복사합니다.</li><li>사용하는 RSS 리더의 구독·피드 추가 메뉴에 붙여넣습니다.</li><li>새로 게시된 글을 RSS 리더에서 확인합니다.</li></ol>
+    <p class="muted"><a href="/rss.xml">XML 피드 열기</a></p>
+  </dialog>
   <dialog class="search-dialog" aria-labelledby="search-dialog-title" data-search-dialog data-pagefind-ignore>
     <div class="dialog-header"><h2 id="search-dialog-title">글 검색</h2><button type="button" data-close-search aria-label="검색 닫기">닫기 ×</button></div>
     <Search />
