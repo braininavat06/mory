@@ -92,3 +92,17 @@ test('a post may belong to multiple independent series, and equal instants sort 
   content.posts[1].data.publishedAt = '2026-10-01T01:00:00+00:00';
   assert.equal(listPages(content.posts.slice(0,2), '/writing/')[0].posts[0].data.id, content.posts[1].data.id);
 });
+
+
+test('a fresh repository with no posts directory is valid; required Pages still report their paths', () => {
+ const root=mkdtempSync(join(tmpdir(),'mory-empty-content-'));
+ try {
+  mkdirSync(join(root,'src/data'),{recursive:true});
+  mkdirSync(join(root,'src/content/pages'),{recursive:true});
+  writeFileSync(join(root,'src/data/categories.yaml'),'{}');
+  for(const page of original.pages)writeFileSync(join(root,page.file),`---\n${stringify(page.data)}---\n${page.body}`);
+  const content=readContent(root);assert.deepEqual(content.posts,[]);assert.deepEqual(content.categories,{});assert.deepEqual(content.series,{});
+  rmSync(join(root,'src/content/pages'),{recursive:true});
+  assert.throws(()=>readContent(root),/src\/content\/pages\/home.md: 필수 page가 없습니다/);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

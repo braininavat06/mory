@@ -307,3 +307,27 @@ test('a populated series can be deleted without deleting or altering any post', 
   assert.equal(readContent(f.publisher.repo).posts.length,posts.length);
  }finally{f.cleanup();}
 });
+
+
+test('after deleting every post, a fresh publish clone can publish category and series deletion', async()=>{
+ const f=setup();
+ try {
+  for(let post of f.store.list().filter(d=>d.kind==='post')) {
+   if(post.value.data.status!=='archived') {
+    assert.equal((await publish(f,post,'archive')).state,'deploying');post=f.store.get(post.key);
+   }
+   assert.equal((await publish(f,post,'delete')).state,'deploying');
+  }
+  // Reproduce a fresh Git checkout: an empty directory is not retained.
+  rmSync(f.publisher.repo,{recursive:true,force:true});
+  const categories=f.store.get('categories:registry');
+  const empty=f.store.save(categories.key,categories.revision,{data:{},body:''});
+  assert.equal((await publish(f,empty)).state,'deploying');
+  assert.equal(existsSync(join(f.publisher.repo,'src/content/posts')),false);
+  assert.deepEqual(readContent(f.publisher.repo).posts,[]);
+  assert.deepEqual(readContent(f.publisher.repo).categories,{});
+  for(const series of f.store.list().filter(d=>d.kind==='series'))assert.equal((await publish(f,series,'delete')).state,'deploying');
+  assert.deepEqual(readContent(f.publisher.repo).series,{});
+  assert.deepEqual(f.store.list().filter(d=>d.kind==='post'||d.kind==='series'),[]);
+ }finally{f.cleanup();}
+});

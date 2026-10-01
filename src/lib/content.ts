@@ -7,7 +7,14 @@ export interface Post { file: string; data: PostData; body: string }
 export interface Page { file: string; key: string; data: PageData; body: string }
 export interface Content { posts: Post[]; pages: Page[]; categories: Categories; series: Series }
 function markdownFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true }); }
+  catch (error) {
+    // Git does not retain empty directories after the last post is deleted.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+  return entries.flatMap(entry =>
     entry.isDirectory() ? markdownFiles(join(dir, entry.name)) : entry.name.endsWith('.md') ? [join(dir, entry.name)] : []).sort();
 }
 export function frontmatter(file: string) {
