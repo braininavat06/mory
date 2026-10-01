@@ -6,12 +6,12 @@ import { rssDate } from '../src/lib/dates.ts';
 import { fixtureContent } from './fixtures.ts';
 
 const base = fixtureContent().posts[0].data;
-test('calendar dates remain strings and reject timestamps, Date objects, and invalid days', () => {
+test('calendar dates remain strings and accept offset datetimes and reject ambiguous times, Date objects, and invalid days', () => {
   for (const field of ['publishedAt', 'updatedAt'] as const) {
-    for (const date of ['2026-01-01', '2026-12-31', '2000-02-29']) {
+    for (const date of ['2026-01-01', '2026-12-31', '2000-02-29', '2026-10-01T15:42:00+09:00']) {
       assert.equal(postSchema.parse({ ...base, [field]: date })[field], date);
     }
-    for (const date of ['2026-02-29', '1900-02-29', '2026-04-31', '2026-10-01T00:00:00+09:00', '2026-09-30T15:00:00Z', new Date('2026-10-01')]) {
+    for (const date of ['2026-02-29', '1900-02-29', '2026-04-31', '2026-09-30T15:00:00Z', new Date('2026-10-01')]) {
       assert.equal(postSchema.safeParse({ ...base, [field]: date }).success, false, `${field}: ${date}`);
     }
   }

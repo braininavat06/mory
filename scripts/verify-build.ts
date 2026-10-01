@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { readContent, publishedPosts, publicSeries } from '../src/lib/content.ts';
 import { listPages, listUrl } from '../src/lib/listing.ts';
 import { SITE } from '../src/lib/config.ts';
-import { rssDate } from '../src/lib/dates.ts';
+import { rssDate, displayDate } from '../src/lib/dates.ts';
 const content = readContent();
 const posts = publishedPosts(content);
 const html = (route: string) => readFileSync(join('dist', route, 'index.html'), 'utf8');
@@ -24,9 +24,9 @@ for (const post of posts) {
   assert.ok(page.includes(`rel="canonical" href="${SITE}${route}"`));
   assert.ok(rss.includes(`${SITE}${route}`));
   assert.ok(rss.includes(`<pubDate>${rssDate(post.data.publishedAt!)}</pubDate>`));
-  assert.ok(page.includes(`<time datetime="${post.data.publishedAt}">${post.data.publishedAt}</time>`));
+  assert.ok(page.includes(`<time datetime="${post.data.publishedAt}">${displayDate(post.data.publishedAt!)}</time>`));
   assert.ok(page.includes(`property="article:published_time" content="${post.data.publishedAt}"`));
-  if (post.data.updatedAt) assert.ok(page.includes(`<time datetime="${post.data.updatedAt}">${post.data.updatedAt}</time>`));
+  if (post.data.updatedAt) assert.ok(page.includes(`<time datetime="${post.data.updatedAt}">${displayDate(post.data.updatedAt)}</time>`));
   for (const alias of post.data.aliases) {
     const compatibility = html(`/writing/${alias}/`); ++routeCount;
     assert.match(compatibility, /http-equiv="refresh"/);

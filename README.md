@@ -27,7 +27,7 @@ src/
   content/posts/          실제 글 .md
   content/pages/          home.md / about.md
   content.config.ts       Astro content collections
-  data/                   categories.yaml / series.yaml
+  data/                   categories.yaml
   lib/                    schema, validation, 정렬/페이지네이션, HTML, asset resolver
   markdown/               unified pipeline / Obsidian / dynamic blocks
   pages/                  Home / About / Writing / Category / Series / RSS
@@ -38,6 +38,9 @@ src/
 public/
   fixtures/               ULID 기반 로컬 이미지·영상
   robots.txt / .nojekyll
+data/series/              시리즈별 YAML (many-to-many)
+cms/                      개인용 CMS server / React client / tests
+runtime/                  SQLite / backups / publish-repo (Git 제외)
 scripts/                  콘텐츠 및 static artifact 검증
 tests/                   독립적인 content / Markdown 회귀 검증
 .github/workflows/        GitHub Pages 빌드와 배포
@@ -51,7 +54,7 @@ id: "01K6F4J0M00000000000000001"
 title: "글 제목"
 slug: "a-place-to-write"
 category: "sample"
-publishedAt: 2026-09-29
+publishedAt: 2026-10-01T15:42:00+09:00
 updatedAt:
 status: "published"
 description: "직접 작성하는 짧은 글 설명."
@@ -64,13 +67,13 @@ aliases:
 - `title`: 변경 가능한 표시 제목. `slug`와 자동 동기화하지 않습니다.
 - `slug`: 소문자 영문/숫자/하이픈. 최초 게시 후 고정하고, 변경할 때 이전 값을 `aliases`에 추가합니다. 목록과 충돌하는 `oldest`, `updated`, `page`는 예약어입니다.
 - `category`: category registry의 ID 하나.
-- `publishedAt`: 최초 공개 날짜. draft는 비워둘 수 있으며 published 전환 시 직접 설정합니다.
-- `updatedAt`: 의미 있는 수정 날짜, 선택 사항. 날짜는 `YYYY-MM-DD` calendar date 문자열만 허용합니다. 저장·표시·정렬에 Date/timezone 변환을 사용하지 않습니다. RSS는 규격상 필요한 날짜 형식에 맞춰 동일한 날짜를 GMT 00:00으로 직렬화합니다.
+- `publishedAt`: 최초 공개 시각. draft는 비워둘 수 있으며 CMS 최초 게시 시 서울 기준 ISO offset datetime을 자동 설정합니다.
+- `updatedAt`: 선택 수정 시각. CMS 변경사항 게시 시 갱신됩니다. timezone offset이 있는 ISO datetime을 허용하며 화면에는 Asia/Seoul 기준 시분을 표시합니다. 기존 `YYYY-MM-DD`는 그대로 호환하여 시각을 추측하지 않습니다. 정렬은 실제 instant 기준이고, legacy date-only는 서울 자정 기준으로 정렬합니다. legacy RSS 날짜는 기존 GMT 00:00을 유지합니다.
 - `status`: `draft`, `published`, `archived`만 허용합니다.
-- `description`: 목록/SEO/Open Graph에 사용합니다.
+- `description`: 목록/SEO/Open Graph에 사용하며 빈 문자열을 허용합니다.
 - `aliases`: 과거 slug 배열. published 글에만 호환 페이지를 만듭니다.
 
-이력에 따른 ID/최초 공개 날짜 불변성, slug 변경 시 alias 추가는 작성자가 유지하는 콘텐츠 규칙입니다. 현재 파일만으로 이전 이력을 추론하거나 자동 변경하지 않습니다.
+이력에 따른 ID/최초 공개 날짜 불변성, slug 변경 시 alias 추가는 작성자가 유지하는 콘텐츠 규칙입니다. 직접 Markdown을 수정할 때는 이전 이력을 작성자가 유지합니다. CMS에서는 최초 게시 후 slug 기본 잠금과 이전 slug 자동 alias 추가를 제공합니다.
 
 보수적인 공개 정책으로 `published`만 상세 경로, 목록, RSS, 검색, 공개 Series 탐색에 포함합니다. draft/archived 본문은 배포하지 않습니다. 비공개 글을 참조하는 wikilink는 진단 후 일반 텍스트로 남깁니다. Series에는 비공개 ID도 저장할 수 있지만 공개 목록/위치/이전·다음에는 공개 글만 포함합니다.
 
@@ -96,7 +99,7 @@ aliases:
 
 `src/data/categories.yaml`에서 key는 영구 내부 ID, `name`은 표시명, `order`는 표시 순서입니다. category name을 바꿔도 글 파일이나 글 URL을 바꿀 필요가 없습니다. 실제 초기 분류가 미정이므로 `sample` 하나만 있습니다.
 
-`src/data/series.yaml`은 이름과 ULID 배열을 저장합니다. 배열 순서가 시리즈 순서이며 한 글은 최대 하나의 시리즈에 속합니다. 존재하지 않는 참조와 중복 소속은 빌드 오류입니다. 글 제목/slug 변경에도 관계가 유지됩니다. 현재 시리즈 역시 검증용 샘플입니다.
+`data/series/<id>.yaml`은 `id`, `name`, optional `description` (기본 빈 문자열), `posts` ULID 배열을 저장합니다. 배열 순서가 시리즈 순서이며 한 글이 여러 시리즈에 속할 수 있습니다. 없는 글 참조와 한 시리즈 내부의 중복 글은 빌드 오류입니다. 기존 sample-series를 같은 ID와 순서로 이전했고 URL은 유지했습니다.
 
 ## Markdown 확장
 
@@ -162,8 +165,12 @@ Pretendard Variable을 로컬 unicode subset 웹폰트로 제공합니다. 기�
 
 workflow는 main push 또는 수동 실행 시 `npm ci → check → test → build → verify → dist artifact 업로드 → Pages 배포`를 수행합니다. 저장소 Pages source를 GitHub Actions로 설정해야 실제 배포할 수 있습니다. Custom domain은 나중에 GitHub Pages Settings에서 직접 설정합니다. Custom Actions 배포에 불필요한 CNAME 파일은 두지 않습니다. 모든 URL은 apex domain 기준이며 `/mory/` base에 의존하지 않습니다.
 
-현재 DNS 설정, `www` redirect, 실제 배포는 수행하지 않았습니다. commit/push도 하지 않았습니다.
+기존 공개 사이트는 GitHub Pages에서 배포됩니다. 로컬 CMS는 Pages artifact에 포함하지 않습니다. DNS 및 `www` redirect는 별도 운영 설정입니다.
 
 ## 의도적으로 제외한 범위
 
-CMS/admin, DB/backend/API, 인증/account, comments, R2 provisioning/upload/remove/cleanup, analytics, AdSense, newsletter, social feed, AI integration, React, MDX, project content type, tags, 고급 Obsidian vault 기능은 구현하지 않았습니다. Post layout에는 향후 모듈을 연결할 slot만 있습니다.
+공개 사이트의 DB/backend/API, 인증/account, comments, R2 provisioning/upload/remove/cleanup, analytics, AdSense, newsletter, social feed, AI integration, 공개 사이트 React, MDX, project content type, tags, 고급 Obsidian vault 기능은 구현하지 않았습니다. Post layout에는 향후 모듈을 연결할 slot만 있습니다.
+
+## 개인용 CMS v1
+
+설치·실행·저장/게시 정책·설정·제약은 [cms/README.md](cms/README.md)를 참조하세요. `npm run check`와 `npm test`에는 CMS typecheck와 로컬 저장소 통합 테스트도 포함됩니다. 공개 사이트는 계속 정적 Astro이며 React/SQLite는 CMS에서만 사용합니다.

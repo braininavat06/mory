@@ -1,7 +1,7 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve, relative, join } from 'node:path';
 import { parse } from 'yaml';
-import { postSchema, pageSchema, categoriesSchema, seriesSchema } from './schema.ts';
+import { postSchema, pageSchema, categoriesSchema, seriesEntrySchema } from './schema.ts';
 import type { PostData, PageData, Categories, Series } from './schema.ts';
 export interface Post { file: string; data: PostData; body: string }
 export interface Page { file: string; key: string; data: PageData; body: string }
@@ -36,12 +36,9 @@ export function validateRelations(content: Content): string[] {
     }
   }
   for (const [alias, file] of aliases) if (slugs.has(alias)) errors.push(`${file}: alias ${alias}와 active slug 충돌 (${slugs.get(alias)})`);
-  const memberships = new Map<string, string>();
   for (const [seriesId, series] of Object.entries(content.series)) {
     for (const id of series.posts) {
-      if (!ids.has(id)) errors.push(`src/data/series.yaml: ${seriesId}에 존재하지 않는 post id ${id}`);
-      if (memberships.has(id)) errors.push(`src/data/series.yaml: duplicate series membership ${id} (${memberships.get(id)}, ${seriesId})`);
-      memberships.set(id, seriesId);
+      if (!ids.has(id)) errors.push(`data/series/${seriesId}.yaml: ${seriesId}에 존재하지 않는 post id ${id}`);
     }
   }
   return errors;
@@ -56,7 +53,16 @@ export function readContent(root = process.cwd()): Content {
     } catch (error) { errors.push(`${file}: ${error instanceof Error ? error.message : error}`); }
   }
   content.categories = read('src/data/categories.yaml', v => categoriesSchema.parse(v))?.data ?? {};
-  content.series = read('src/data/series.yaml', v => seriesSchema.parse(v))?.data ?? {};
+  const seriesDir = resolve(root, 'data/series');
+  if (existsSync(seriesDir)) for (const name of readdirSync(seriesDir).filter(n => n.endsWith('.yaml')).sort()) {
+    const file = `data/series/${name}`;
+    const entry = read(file, v => seriesEntrySchema.parse(v))?.data;
+    if (entry) {
+      if (name !== `${entry.id}.yaml`) errors.push(`${file}: 파일명과 series id가 다릅니다.`);
+      if (content.series[entry.id]) errors.push(`${file}: 중복 series id`);
+      const { id, ...data } = entry; content.series[id] = data;
+    }
+  }
   for (const path of markdownFiles(resolve(root, 'src/content/posts'))) {
     const file = relative(root, path);
     const entry = read(file, v => postSchema.parse(v), true);
@@ -78,6 +84,6 @@ export function orderedCategories(content: Content) {
 }
 export function publicSeries(content: Content) {
   const published = new Map(publishedPosts(content).map(p => [p.data.id, p]));
-  return Object.entries(content.series).map(([id, series]) => ({ id, name: series.name,
+  return Object.entries(content.series).map(([id, series]) => ({ id, name: series.name, description: series.description,
     posts: series.posts.flatMap(postId => published.has(postId) ? [published.get(postId)!] : []) })).filter(s => s.posts.length);
 }

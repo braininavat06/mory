@@ -1,4 +1,5 @@
 ---
+import { displayDate } from '../lib/dates.ts';
 import Base from './Base.astro';
 import TOC from '../components/TOC.astro';
 import { readContent, publishedPosts, publicSeries } from '../lib/content.ts';
@@ -8,10 +9,7 @@ interface Props { post: Post; headings: { depth: number; slug: string; text: str
 const { post, headings } = Astro.props;
 const p = post.data;
 const content = readContent();
-const series = publicSeries(content).find(s => s.posts.some(entry => entry.data.id === p.id));
-const position = series?.posts.findIndex(entry => entry.data.id === p.id) ?? -1;
-const previousInSeries = series?.posts[position - 1];
-const nextInSeries = series?.posts[position + 1];
+const memberships = publicSeries(content).filter(s => s.posts.some(entry => entry.data.id === p.id));
 const chronological = sortPosts(publishedPosts(content), 'oldest');
 const chronologicalIndex = chronological.findIndex(entry => entry.data.id === p.id);
 const older = chronological[chronologicalIndex - 1];
@@ -24,18 +22,22 @@ const hasTOC = headings.some(h => (h.depth === 2 || h.depth === 3) && h.slug !==
       <header class="post-heading">
         <a class="eyebrow" href={`/category/${p.category}/`} data-pagefind-ignore>{content.categories[p.category].name}</a>
         <h1 data-pagefind-meta="title">{p.title}</h1>
-        <div class="post-meta" data-pagefind-ignore><time datetime={p.publishedAt!}>{p.publishedAt!}</time>{p.updatedAt && <span>· 수정 <time datetime={p.updatedAt}>{p.updatedAt}</time></span>}</div>
+        <div class="post-meta" data-pagefind-ignore>게시 <time datetime={p.publishedAt!}>{displayDate(p.publishedAt!)}</time>{p.updatedAt && <span>· 수정 <time datetime={p.updatedAt}>{displayDate(p.updatedAt)}</time></span>}</div>
         <p class="post-description" data-pagefind-meta="description" data-pagefind-ignore>{p.description}</p>
       </header>
       <div class="prose post-body"><slot /></div>
     </article>
     <TOC headings={headings} />
     <div class="post-afterword" data-pagefind-ignore>
-      {series && <section class="series-navigation" aria-label="시리즈 탐색">
+      {memberships.map(series => {
+        const position = series.posts.findIndex(entry => entry.data.id === p.id);
+        const previousInSeries = series.posts[position - 1];
+        const nextInSeries = series.posts[position + 1];
+        return <section class="series-navigation" aria-label="시리즈 탐색">
         <p class="eyebrow">시리즈 · {position + 1} / {series.posts.length}</p><h2><a href={`/series/${series.id}/`}>{series.name}</a></h2>
         <ol>{series.posts.map(entry => <li><a href={`/writing/${entry.data.slug}/`} aria-current={entry.data.id === p.id ? 'page' : undefined}>{entry.data.title}</a>{entry.data.id === p.id && <span class="current-label">현재 글</span>}</li>)}</ol>
         <nav class="adjacent-links" aria-label="시리즈 이전과 다음">{previousInSeries && <a href={`/writing/${previousInSeries.data.slug}/`}>← 시리즈 이전 글<span>{previousInSeries.data.title}</span></a>}{nextInSeries && <a href={`/writing/${nextInSeries.data.slug}/`}>시리즈 다음 글 →<span>{nextInSeries.data.title}</span></a>}</nav>
-      </section>}
+      </section>; })}
       <nav class="chronological-navigation adjacent-links" aria-label="게시일 기준 이전과 다음">{older && <a href={`/writing/${older.data.slug}/`}>← 이전에 쓴 글<span>{older.data.title}</span></a>}{newer && <a href={`/writing/${newer.data.slug}/`}>이후에 쓴 글 →<span>{newer.data.title}</span></a>}</nav>
       <!-- Future comments module can use this layout slot; v1 has no comments implementation. -->
       <slot name="after-post" />

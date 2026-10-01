@@ -18,7 +18,6 @@ test('all relation conflicts report source paths', () => {
     ['id', c => { c.posts[1].data.id = c.posts[0].data.id; }, /duplicate post id/],
     ['slug', c => { c.posts[1].data.slug = c.posts[0].data.slug; }, /duplicate slug/],
     ['category', c => { c.posts[0].data.category = 'missing'; }, /invalid category/],
-    ['series membership', c => { c.series['second'] = { name: 'Second', posts: [c.posts[0].data.id] }; }, /duplicate series membership/],
     ['missing series post', c => { c.series['sample-series'].posts.push('01K6F4J0M000000000000000ZZ'); }, /존재하지 않는 post id/],
     ['duplicate aliases', c => { c.posts[1].data.aliases.push(c.posts[0].data.aliases[0]); }, /alias 충돌/],
     ['alias/slug', c => { c.posts[0].data.aliases.push(c.posts[1].data.slug); }, /active slug 충돌/],
@@ -27,7 +26,7 @@ test('all relation conflicts report source paths', () => {
   for (const [name, mutate, message] of cases) {
     const content = clone(); mutate(content);
     const errors = validateRelations(content);
-    assert.ok(errors.some(e => message.test(e) && /src\/(content\/posts|data\/series.yaml)/.test(e)), name);
+    assert.ok(errors.some(e => message.test(e) && /(src\/content\/posts|data\/series\/.*\.yaml)/.test(e)), name);
   }
 });
 test('invalid schema reports filenames through the same reader used by build', () => {
@@ -82,4 +81,14 @@ test('asset provider changes without editing Markdown; traversal is rejected', (
   assert.equal(assetUrl('shared/some image.webp', undefined, '/fixtures'), '/fixtures/shared/some%20image.webp');
   assert.throws(() => assetUrl('../private.webp', id));
   assert.throws(() => assetUrl('image.webp'));
+});
+
+test('a post may belong to multiple independent series, and equal instants sort consistently', () => {
+  const content = clone();
+  content.series.second = { name: 'Second', description: '', posts: [content.posts[0].data.id] };
+  assert.equal(validateRelations(content).length, 0);
+  assert.equal(publicSeries(content).filter(s => s.posts.some(p => p.data.id === content.posts[0].data.id)).length, 2);
+  content.posts[0].data.publishedAt = '2026-10-01T09:00:00+09:00';
+  content.posts[1].data.publishedAt = '2026-10-01T01:00:00+00:00';
+  assert.equal(listPages(content.posts.slice(0,2), '/writing/')[0].posts[0].data.id, content.posts[1].data.id);
 });
