@@ -2,8 +2,8 @@
 .cms-header { display: flex; align-items: center; gap: 24px; padding: 20px 32px; border-bottom: 1px solid var(--line); }
 .cms-header > a { font-weight: 750; text-decoration: none; font-size: 1.5rem; white-space: nowrap; }
 .cms-header small { color: var(--muted); font-size: .8rem; font-weight: 400; }
-.cms-header nav { display: flex; flex-wrap: wrap; gap: 16px; flex: 1; }
-.cms-header nav button { border: 0; padding-inline: 0; }
+.cms-header nav { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
+.cms-header nav button { display: inline-flex; align-items: center; justify-content: center; min-width: 48px; min-height: 48px; padding: 8px 12px; border: 0; white-space: nowrap; }
 .cms-header [aria-current], .view-modes [aria-pressed='true'] { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
 .cms-header select { background: transparent; border: 0; }
 .cms-main { max-width: 1440px; margin: 36px auto; padding: 0 32px; }
@@ -74,10 +74,10 @@
 button:disabled, input:disabled { opacity: .55; cursor: default; }
 @media (max-width: 999px) {
  .cms-header { padding: 16px; gap: 12px; flex-wrap: wrap; }
- .cms-header nav { order: 3; flex-basis: 100%; gap: 20px; }
+ .cms-header nav { order: 3; flex-basis: 100%; min-width: 0; display: grid; grid-template-columns: repeat(6, minmax(44px, 1fr)); gap: 4px; }
  .cms-header > select { margin-left: auto; }
  .cms-main { padding-inline: 16px; margin-top: 24px; }
- .cms-header nav button { font-size: .9rem; }
+ .cms-header nav button { min-width: 44px; padding-inline: 3px; font-size: .85rem; }
  .cms-list button { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
  .cms-list strong { grid-column: 1 / -1; }
  .cms-list time { grid-column: 1 / -1; }

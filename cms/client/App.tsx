@@ -12,7 +12,7 @@ import { useScrollSync } from './scroll-sync.ts';
 import { LinkIssues } from './LinkIssues.tsx';
 import { Tips } from './Tips.tsx';
 type State = { drafts: Draft[]; jobs: PublishJob[]; localSync: LocalSync | null; canRetryDeployment?: boolean };
-const menuLabels: Record<string, string> = { Writing: '글', Categories: '분류', Series: '시리즈', Pages: '페이지', Issues: '오류 해결', Tips: '팁' };
+const menuLabels: Record<string, string> = { Writing: '글', Categories: '분류', Series: '시리즈', Pages: '페이지', Issues: '오류', Tips: '팁' };
 const recoveryStorage = { getItem: (key: string) => { try { return localStorage.getItem(key); } catch { return null; } }, setItem: (key: string, value: string) => { try { localStorage.setItem(key, value); } catch {} }, removeItem: (key: string) => { try { localStorage.removeItem(key); } catch {} } };
 const name = (d: Draft) => d.value.data.title || d.value.data.name || (d.kind === 'categories' ? '분류' : '제목 없는 글');
 function jobLabel(job: PublishJob) {

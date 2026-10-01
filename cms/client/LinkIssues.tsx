@@ -13,7 +13,7 @@ export function LinkIssues({ open }: { open: (key: string) => void }) {
   }
   useEffect(() => { void scan(); }, []);
   return <section className="link-issues">
-    <div className="section-heading"><h1>오류 해결</h1><button disabled={loading} onClick={() => void scan()}>다시 확인</button></div>
+    <div className="section-heading"><h1>오류</h1><button disabled={loading} onClick={() => void scan()}>다시 확인</button></div>
     <p>끊어진 위키링크가 있는 글과 페이지입니다. 링크는 화면에서 텍스트로 표시되며, 게시·삭제를 막지 않습니다.</p>
     <p className="muted">작업본과 마지막 공개본을 따로 확인합니다. 공개본의 링크를 수정하려면 변경사항을 게시해 주세요.</p>
     {loading ? <p role="status">링크 확인 중…</p> : error ? <p role="alert">! {error}</p> : !documents.length ? <p role="status">끊어진 위키링크가 없습니다.</p> : <>
