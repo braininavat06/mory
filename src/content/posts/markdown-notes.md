@@ -1,12 +1,11 @@
 ---
-id: "01K6F4J0M00000000000000002"
-title: "Markdown으로 이어 쓰기"
-slug: "markdown-notes"
-category: "sample"
+id: 01K6F4J0M00000000000000002
+title: Markdown으로 이어 쓰기
+slug: markdown-notes
+category: sample
 publishedAt: 2026-09-30
-updatedAt:
-status: "published"
-description: "파일로 남긴 글이 목록과 시리즈, 검색으로 연결되는 방식을 확인하는 두 번째 샘플."
+status: archived
+description: 파일로 남긴 글이 목록과 시리즈, 검색으로 연결되는 방식을 확인하는 두 번째 샘플.
 aliases: []
 ---
 이 글은 시리즈 순서와 검색을 확인하기 위한 두 번째 샘플입니다. [[a-place-to-write]]에서 시작한 기록을 이어갑니다.
