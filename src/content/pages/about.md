@@ -1,6 +1,6 @@
 ---
 title: 소개
-description: Mory에 관하여.
+description: Mory에 관하여
 imageDimensions: {}
 ---
 # 소개
