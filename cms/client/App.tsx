@@ -13,6 +13,8 @@ import { useScrollSync } from './scroll-sync.ts';
 import { LinkIssues } from './LinkIssues.tsx';
 import { DeploymentControl } from './DeploymentControl.tsx';
 import { Tips } from './Tips.tsx';
+import { CmsNavigation, readLocation } from './navigation.ts';
+import type { CmsMenu } from './navigation.ts';
 type State = { drafts: Draft[]; jobs: PublishJob[]; localSync: LocalSync | null; canRetryDeployment?: boolean };
 const menuLabels: Record<string, string> = { Writing: '글', Categories: '분류', Series: '시리즈', Pages: '페이지', Issues: '오류', Tips: '팁' };
 const recoveryStorage = { keys: () => { try { return Object.keys(localStorage); } catch { return []; } }, getItem: (key: string) => { try { return localStorage.getItem(key); } catch { return null; } }, setItem: (key: string, value: string) => { try { localStorage.setItem(key, value); } catch {} }, removeItem: (key: string) => { try { localStorage.removeItem(key); } catch {} } };
@@ -28,18 +30,40 @@ function jobLabel(job: PublishJob) {
 }
 function App() {
   const [state, setState] = useState<State>({ drafts: [], jobs: [], localSync: null });
-  const [menu, setMenu] = useState('Writing'), [selected, setSelected] = useState<Draft | null>(null), [error, setError] = useState('');
+  const [location, setLocation] = useState(() => readLocation(window.location.hash));
+  const menu = location.menu;
+  const [loaded, setLoaded] = useState(false), [error, setError] = useState('');
+  const selected = location.draft ? state.drafts.find(d => d.key === location.draft) ?? null : menu === 'Categories' ? state.drafts.find(d => d.kind === 'categories') ?? null : null;
   const [syncing, setSyncing] = useState(false);
   const [query, setQuery] = useState(''), [filter, setFilter] = useState('전체'), [category, setCategory] = useState('');
   const navigateGuard = useRef<((action: () => void) => void) | null>(null);
-  const navigate = (action: () => void) => navigateGuard.current ? navigateGuard.current(action) : action();
-  const refresh = useCallback(async () => { try { setState(await api<State>('/api/state')); } catch (e) { setError(String((e as Error).message)); } }, []);
+  const navigation = useRef<CmsNavigation | null>(null);
+  useEffect(() => {
+    const controller = new CmsNavigation(window.history, window.location.hash, action => {
+      const load = () => {
+        void api<State>('/api/state').then(next => { setState(next); setLoaded(true); action(); })
+          .catch(e => setError((e as Error).message));
+      };
+      if (navigateGuard.current) navigateGuard.current(load); else load();
+    }, setLocation);
+    navigation.current = controller;
+    const pop = (event: PopStateEvent) => controller.pop(window.location.hash, event.state);
+    window.addEventListener('popstate', pop);
+    return () => { window.removeEventListener('popstate', pop); navigation.current = null; };
+  }, []);
+  const go = (menu: CmsMenu, draft?: string, replace = false) => navigation.current?.navigate({ menu, ...(draft ? { draft } : {}) }, replace);
+  const refresh = useCallback(async () => { try { setState(await api<State>('/api/state')); setLoaded(true); } catch (e) { setError(String((e as Error).message)); } }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { if (!state.jobs.some(j => ['publishing', 'deploying'].includes(j.state))) return; const timer = setInterval(() => { void refresh(); }, 4000); return () => clearInterval(timer); }, [state.jobs.some(j => ['publishing', 'deploying'].includes(j.state)), refresh]);
   const needsSync = (job: PublishJob | undefined) => !!state.localSync?.pending && job?.commit_sha === state.localSync.publication_sha;
   const listingStatus = (d: Draft) => { const job = state.jobs.find(j => j.key === d.key); const base = d.kind === 'series' && !d.published ? '미게시' : d.status; const label = !job || ['complete', 'superseded'].includes(job.state) ? base : `${base} · ${jobLabel(job)}`; return label + (needsSync(job) ? ' · 로컬 저장소 동기화 필요' : ''); };
-  useEffect(() => { if (menu === 'Categories' && !selected) { const registry = state.drafts.find(d => d.kind === 'categories'); if (registry) setSelected(registry); } }, [menu, selected, state.drafts]);
-  const select = (d: Draft) => { setSelected(d); setError(''); };
+  useEffect(() => {
+    if (loaded && location.draft && !state.drafts.some(d => d.key === location.draft)) {
+      setError('문서를 찾을 수 없습니다. 삭제되었거나 현재 작업 목록에 없는 문서입니다.');
+      go(menu, undefined, true);
+    }
+  }, [loaded, location, state.drafts]);
+  const select = (d: Draft) => { go(menu, d.key); setError(''); };
   const publishedCategories = state.drafts.find(d => d.kind === 'categories')?.published?.data ?? {};
   async function create(kind: 'post' | 'series') {
     try { const id = kind === 'series' ? prompt('시리즈 ID (영문 소문자·숫자·하이픈)') : undefined; if (kind === 'series' && !id) return;
@@ -47,8 +71,8 @@ function App() {
     } catch (e) { setError((e as Error).message); }
   }
   const kind = menu === 'Writing' ? 'post' : menu === 'Series' ? 'series' : menu === 'Pages' ? 'page' : 'categories';
-  return <><header className="cms-header"><a href="/" onClick={e => { e.preventDefault(); navigate(() => { setSelected(null); setMenu('Writing'); void refresh(); }); }}>Mory <small>CMS</small></a><nav aria-label="CMS 메뉴">{Object.keys(menuLabels).map(m => <button key={m} aria-current={menu === m ? 'page' : undefined} onClick={() => navigate(() => { setSelected(m === 'Categories' ? state.drafts.find(d => d.kind === 'categories') ?? null : null); setMenu(m); void refresh(); })}>{menuLabels[m]}</button>)}</nav><select aria-label="테마" defaultValue={document.documentElement.dataset.theme} onChange={e => { document.documentElement.dataset.theme = e.target.value; try { localStorage.setItem('mory-cms-theme', e.target.value); } catch {} window.dispatchEvent(new Event('mory-themechange')); }}><option value="light">밝게</option><option value="dark">어둡게</option></select><DeploymentControl contentVersion={state.jobs.map(j => `${j.id}:${j.state}:${j.commit_sha}`).join('|')} /></header>
-  <main className="cms-main">{state.localSync?.pending && <section className="notice" role="status"><p>콘텐츠는 게시되었습니다. 로컬 저장소 동기화가 필요합니다.</p>{state.localSync.error && <p>{state.localSync.error}</p>}<button disabled={syncing} onClick={() => { setSyncing(true); void api<LocalSync | null>('/api/local-sync/retry', 'POST', {}).then(() => refresh()).catch(e => setError(e.message)).finally(() => setSyncing(false)); }}>{syncing ? '동기화 중…' : '다시 동기화'}</button></section>}{error && <p role="alert">! {error}</p>}{selected ? <Editor key={selected.key} navigateGuard={navigateGuard} initial={selected} state={state} refresh={refresh} back={() => { setSelected(null); void refresh(); }} /> : menu === 'Tips' ? <Tips /> : menu === 'Issues' ? <LinkIssues open={key => { const draft = state.drafts.find(d => d.key === key); if (draft) select(draft); }} /> : <>
+  return <><header className="cms-header"><a href="/" onClick={e => { e.preventDefault(); go('Writing'); }}>Mory <small>CMS</small></a><nav aria-label="CMS 메뉴">{Object.keys(menuLabels).map(m => <button key={m} aria-current={menu === m ? 'page' : undefined} onClick={() => { go(m as CmsMenu); }}>{menuLabels[m]}</button>)}</nav><select aria-label="테마" defaultValue={document.documentElement.dataset.theme} onChange={e => { document.documentElement.dataset.theme = e.target.value; try { localStorage.setItem('mory-cms-theme', e.target.value); } catch {} window.dispatchEvent(new Event('mory-themechange')); }}><option value="light">밝게</option><option value="dark">어둡게</option></select><DeploymentControl contentVersion={state.jobs.map(j => `${j.id}:${j.state}:${j.commit_sha}`).join('|')} /></header>
+  <main className="cms-main">{state.localSync?.pending && <section className="notice" role="status"><p>콘텐츠는 게시되었습니다. 로컬 저장소 동기화가 필요합니다.</p>{state.localSync.error && <p>{state.localSync.error}</p>}<button disabled={syncing} onClick={() => { setSyncing(true); void api<LocalSync | null>('/api/local-sync/retry', 'POST', {}).then(() => refresh()).catch(e => setError(e.message)).finally(() => setSyncing(false)); }}>{syncing ? '동기화 중…' : '다시 동기화'}</button></section>}{error && <p role="alert">! {error}</p>}{!loaded && location.draft ? <p role="status">문서 불러오는 중…</p> : selected ? <Editor key={selected.key} navigateGuard={navigateGuard} initial={selected} state={state} refresh={refresh} back={() => go(menu)} /> : menu === 'Tips' ? <Tips /> : menu === 'Issues' ? <LinkIssues open={key => { const draft = state.drafts.find(d => d.key === key); if (draft) select(draft); }} /> : <>
     <div className="section-heading"><h1>{menuLabels[menu]}</h1>{kind === 'post' || kind === 'series' ? <button onClick={() => void create(kind)}>+ 새 {kind === 'post' ? '글' : '시리즈'}</button> : null}</div>
     {kind === 'post' && <div className="filters"><input aria-label="글 목록 검색" placeholder="제목·설명 검색" value={query} onChange={e => setQuery(e.target.value)} /><select aria-label="상태 필터" value={filter} onChange={e => setFilter(e.target.value)}>{['전체', '초안', '게시됨', '수정 중', '보관됨'].map(s => <option key={s}>{s}</option>)}</select><select aria-label="분류 필터" value={category} onChange={e => setCategory(e.target.value)}><option value="">모든 분류</option>{Object.entries(publishedCategories).map(([id, c]) => <option key={id} value={id}>{(c as any).name}</option>)}</select></div>}
     <ul className="cms-list">{state.drafts.filter(d => d.kind === kind && (kind !== 'post' || ((filter === '전체' || d.status === filter) && (!category || d.value.data.category === category) && `${name(d)} ${d.value.data.description}`.toLowerCase().includes(query.toLowerCase())))).map(d => <li key={d.key}><button onClick={() => select(d)}><strong>{name(d)}</strong><span>{d.kind === 'post' ? publishedCategories[d.value.data.category]?.name ?? '분류 없음' : d.kind === 'series' ? `${d.value.data.posts?.length ?? 0}편` : ''}</span><span>{listingStatus(d)}</span><time>{displayDate(d.updated_at)}</time></button></li>)}</ul>
