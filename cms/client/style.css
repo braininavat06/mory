@@ -102,7 +102,9 @@ button:disabled, input:disabled { opacity: .55; cursor: default; }
 .image-upload-status { padding-left: 20px; font-size: .85rem; overflow-wrap: anywhere; }
 
 .deployment-toggle { font-size: .8rem; padding: 8px 10px; min-height: 44px; white-space: nowrap; max-width: 135px; overflow: hidden; text-overflow: ellipsis; }
-.deployment-dialog { background: var(--surface); color: var(--text); border: 1px solid var(--line); padding: 24px; width: min(540px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; }
+html:has(.deployment-dialog[open]) { overflow: hidden; scrollbar-gutter: stable; }
+body:has(.deployment-dialog[open]) { overflow: hidden; }
+.deployment-dialog { background: var(--surface); color: var(--text); border: 1px solid var(--line); padding: 24px; width: min(540px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; }
 .deployment-dialog::backdrop { background: rgb(0 0 0 / .45); }
 .deployment-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .deployment-heading h2 { margin: 0; font-size: 1.25rem; }
