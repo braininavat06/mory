@@ -167,7 +167,8 @@ mory-search input { width: 100%; }
 .search-results li { padding: 18px 0; border-bottom: 1px solid var(--line); }
 .search-results h3 { margin: 0 0 8px; font-size: 1.05rem; }
 .search-results p { margin: 0; font-size: .9rem; color: var(--muted); }
-.search-dialog, .rss-dialog { width: min(700px, calc(100vw - 32px)); max-height: 82vh; padding: 30px; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+html:has(dialog[open]), body:has(dialog[open]) { overflow: hidden; }
+.search-dialog, .rss-dialog { overflow: auto; overscroll-behavior: contain; width: min(700px, calc(100vw - 32px)); max-height: 82vh; padding: 30px; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
 .search-dialog::backdrop, .rss-dialog::backdrop { background: rgb(0 0 0 / .45); }
 .rss-address { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 .rss-address input { flex: 1 1 220px; max-width: 100%; }
@@ -215,5 +216,5 @@ mory-search input { width: 100%; }
 }
 
 .image-figure { margin: 1.6em 0; }
-.image-figure img { display: block; height: auto; }
+.image-figure img { display: block; height: auto; margin: 0; }
 .image-figure figcaption { margin-top: .6em; color: var(--muted); font-size: .88em; line-height: 1.6; }

@@ -26,5 +26,9 @@ const destination = post ? `/writing/${post.data.slug}/` : '';
 {kind === 'listing' && <ListingLayout listing={listing!} />}
 {kind === 'post' && Content && <PostLayout post={post!} headings={rendered!.headings}><Content /></PostLayout>}
 {kind === 'alias' && <Base title={post!.data.title} description={post!.data.description} canonical={destination} noindex redirect={destination}>
+  <script slot="head" is:inline define:vars={{ destination }}>
+    // Keep heading links and category navigation when an old slug is used.
+    window.location.replace(destination + window.location.search + window.location.hash);
+  </script>
   <section class="page-content prose"><h1>글 주소가 변경되었습니다</h1><p><a href={destination}>{post!.data.title} — 현재 글로 이동</a></p></section>
 </Base>}

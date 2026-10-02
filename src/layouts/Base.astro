@@ -5,6 +5,7 @@ import { SITE, SITE_NAME, SITE_DESCRIPTION } from '../lib/config.ts';
 import '../styles/global.css';
 interface Props { title?: string; description?: string; canonical?: string; noindex?: boolean; redirect?: string; type?: 'website' | 'article'; publishedAt?: string; updatedAt?: string }
 const { title = SITE_NAME, description = SITE_DESCRIPTION, canonical = Astro.url.pathname, noindex = false, redirect, type = 'website', publishedAt, updatedAt } = Astro.props;
+const metaDescription = description.trim() || SITE_DESCRIPTION;
 const documentTitle = title === SITE_NAME ? title : `${title} · ${SITE_NAME}`;
 const canonicalUrl = new URL(canonical, SITE).href;
 const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.pathname);
@@ -23,11 +24,11 @@ const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.path
     })();
   </script>
   <title>{documentTitle}</title>
-  <meta name="description" content={description} data-pagefind-meta="description[content]" />
+  <meta name="description" content={metaDescription} data-pagefind-meta="description[content]" />
   <link rel="canonical" href={canonicalUrl} />
   <meta property="og:site_name" content={SITE_NAME} />
   <meta property="og:title" content={documentTitle} />
-  <meta property="og:description" content={description} />
+  <meta property="og:description" content={metaDescription} />
   <meta property="og:type" content={type} />
   <meta property="og:url" content={canonicalUrl} />
   <meta property="og:locale" content="ko_KR" />

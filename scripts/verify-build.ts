@@ -17,6 +17,11 @@ for (const route of ['/', '/about/']) {
   assert.ok(page.includes(`rel="canonical" href="${SITE}${route}"`));
   assert.doesNotMatch(page, /data-pagefind-body/);
 }
+const notFound = readFileSync('dist/404.html', 'utf8');
+assert.match(notFound, /페이지를 찾을 수 없습니다/);
+assert.match(notFound, /noindex,follow/);
+assert.doesNotMatch(notFound, /data-pagefind-body/);
+assert.ok(!sitemap.includes(`${SITE}/404`));
 for (const post of posts) {
   const route = `/writing/${post.data.slug}/`;
   const page = html(route); ++routeCount;
@@ -34,11 +39,17 @@ for (const post of posts) {
     assert.ok(compatibility.includes(`rel="canonical" href="${SITE}${route}"`));
     assert.doesNotMatch(compatibility, /data-pagefind-body/);
     assert.ok(!sitemap.includes(`${SITE}/writing/${alias}/`));
+    assert.ok(!rss.includes(`${SITE}/writing/${alias}/`));
+    assert.ok(compatibility.includes(`content="0;url=${route}"`));
   }
 }
 for (const post of content.posts.filter(p => p.data.status !== 'published')) {
   assert.ok(!existsSync(`dist/writing/${post.data.slug}/index.html`));
-  assert.ok(!rss.includes(`${SITE}/writing/${post.data.slug}/`));
+  for(const slug of [post.data.slug,...post.data.aliases]) {
+    assert.ok(!existsSync(`dist/writing/${slug}/index.html`));
+    assert.ok(!rss.includes(`${SITE}/writing/${slug}/`));
+    assert.ok(!sitemap.includes(`${SITE}/writing/${slug}/`));
+  }
 }
 const listings = [
   ...listPages(posts, '/writing/'),

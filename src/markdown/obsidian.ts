@@ -132,15 +132,16 @@ export function remarkObsidian(this: any, options: { content?: Content; onBroken
               ? `<video controls preload="metadata"${width} aria-label="${escapeHtml(name)}"><source src="${escapeHtml(url!)}" type="video/${extension}"><a href="${escapeHtml(url!)}">${escapeHtml(name)} 다운로드</a></video>`
               : imageHtml(target,label) });
           } else {
-            const post = content.posts.find(p => p.data.slug === target);
+            const post = content.posts.find(p => p.data.slug === target || p.data.aliases.includes(target));
             if (!post) {
               file.message(`존재하지 않는 wikilink slug: ${target}; 텍스트로 표시합니다.`, text.position, 'mory:wikilink');
               options.onBrokenWikilink?.({ target, label: label || target, line: (text.position?.start.line ?? 1) + text.value.slice(0, match.index).split('\n').length - 1 });
               result.push({ type: 'text', value: label || target });
             } else if (post.data.status !== 'published') {
               file.message(`비공개 글을 참조하는 wikilink: ${target}; 공개 링크를 생성하지 않습니다.`, text.position, 'mory:wikilink');
+              options.onBrokenWikilink?.({ target, label:label||target, line:text.position?.start.line??1 });
               result.push({ type: 'text', value: label || target });
-            } else result.push({ type: 'link', url: `/writing/${target}/`, children: [{ type: 'text', value: label || target }] });
+            } else result.push({ type: 'link', url: `/writing/${post.data.slug}/`, children: [{ type: 'text', value: label || target }] });
           }
         }
         previous = match.index! + match[0].length;

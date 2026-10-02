@@ -11,6 +11,6 @@ export default defineConfig({
   site: SITE,
   output: 'static',
   trailingSlash: 'always',
-  integrations: [sitemap({ filter: url => !aliases.has(url) })],
+  integrations: [sitemap({ filter: url => !aliases.has(url) && !['/404/', '/404.html'].includes(new URL(url).pathname) })],
   markdown: markdownOptions,
 });
