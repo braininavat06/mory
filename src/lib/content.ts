@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve, relative, join } from 'node:path';
 import { parse } from 'yaml';
-import { postSchema, pageSchema, categoriesSchema, seriesEntrySchema } from './schema.ts';
+import { postSchema, pageSchema, categoriesSchema, seriesEntrySchema, validationMessage } from './schema.ts';
 import type { PostData, PageData, Categories, Series } from './schema.ts';
 export interface Post { file: string; data: PostData; body: string }
 export interface Page { file: string; key: string; data: PageData; body: string }
@@ -57,7 +57,7 @@ export function readContent(root = process.cwd()): Content {
     try {
       const raw = markdown ? frontmatter(resolve(root, file)) : { data: parse(readFileSync(resolve(root, file), 'utf8')), body: '' };
       return { data: parser(raw.data), body: raw.body };
-    } catch (error) { errors.push(`${file}: ${error instanceof Error ? error.message : error}`); }
+    } catch (error) { errors.push(`${file}: ${validationMessage(error)}`); }
   }
   content.categories = read('src/data/categories.yaml', v => categoriesSchema.parse(v))?.data ?? {};
   const seriesDir = resolve(root, 'data/series');

@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo
 import { createRoot } from 'react-dom/client';
 import type { Action, Draft, Payload, PublishJob, LocalSync } from '../shared.ts';
 import { categoryReferences } from '../shared.ts';
+import { generatePostSlug } from '../slug.ts';
 import { api } from './api.ts';
 import { Autosave } from './autosave.ts';
 import type { Recovery } from './autosave.ts';
@@ -142,7 +143,11 @@ function Editor({ initial, state, refresh, back, navigateGuard }: { navigateGuar
     if (recovery) { setError('먼저 복구 내용을 확인하세요.'); return; }
     if (action === 'delete' && !confirm(initial.kind === 'series' ? '이 시리즈를 삭제할까요? 글은 그대로 유지됩니다.' : '이 글을 영구 삭제할까요? 모든 시리즈에서도 제거됩니다.')) return;
     setLocked(true); setError('');
-    try { await autosave.flush(); const next = await api<PublishJob>(`/api/publish/${initial.key}`, 'POST', { revision: autosave.revision, action }); setJob(next); if (next.state !== 'publishing') setLocked(false); }
+    try {
+      if (action === 'publish' && initial.kind === 'post' && !autosave.draft.ever_published && !autosave.value.data.slug)
+        autosave.change({ ...autosave.value, data: { ...autosave.value.data, slug: generatePostSlug(String(autosave.value.data.title ?? ''), initial.id) } });
+      await autosave.flush(); const next = await api<PublishJob>(`/api/publish/${initial.key}`, 'POST', { revision: autosave.revision, action }); setJob(next); if (next.state !== 'publishing') setLocked(false);
+    }
     catch (e) { setError((e as Error).message); setLocked(false); }
   }
   async function reload(publicCopy = false) {
@@ -168,7 +173,7 @@ function Editor({ initial, state, refresh, back, navigateGuard }: { navigateGuar
     {['post', 'page'].includes(initial.kind) && <>
       <label>제목<input value={data.title ?? ''} onChange={e => field('title', e.target.value)} /></label>
       {initial.kind === 'post' && <label>분류<select value={data.category ?? ''} onChange={e => field('category', e.target.value)}><option value="">분류 선택</option>{Object.entries(categories).map(([id, c]) => <option key={id} value={id}>{(c as any).name}</option>)}</select></label>}
-      <details className="publication-settings"><summary>게시 설정</summary>{initial.kind === 'post' && <><label>주소 (slug)<input value={data.slug ?? ''} disabled={autosave.draft.ever_published && !slugChange} onChange={e => field('slug', e.target.value)} /></label>{autosave.draft.ever_published && <label className="check-label"><input type="checkbox" checked={slugChange} onChange={e => { slugAllowed.current = e.target.checked; setSlugChange(e.target.checked); }} />게시된 주소 변경 · 이전 주소는 자동 보존</label>}</>}
+      <details className="publication-settings"><summary>게시 설정</summary>{initial.kind === 'post' && <><label>주소 (slug)<input value={data.slug ?? ''} placeholder="제목 저장 시 자동 생성" aria-describedby="slug-help" autoCapitalize="none" spellCheck={false} disabled={autosave.draft.ever_published && !slugChange} onChange={e => field('slug', e.target.value)} /></label><p id="slug-help" className="muted">소문자 영문·숫자·하이픈을 사용합니다. 빈 주소는 자동 생성하며, 설정된 주소는 제목을 바꿔도 유지됩니다. 최초 게시 전에는 직접 수정할 수 있습니다.</p>{autosave.draft.ever_published && <label className="check-label"><input type="checkbox" checked={slugChange} onChange={e => { slugAllowed.current = e.target.checked; setSlugChange(e.target.checked); }} />게시된 주소 변경 · 이전 주소는 자동 보존</label>}</>}
       <label>짧은 설명<textarea value={data.description ?? ''} onChange={e => field('description', e.target.value)} /></label>
       {initial.kind === 'post' && <><label>최초 게시 시각 (고급)<input placeholder="자동 설정 · ISO 8601 +09:00" value={data.publishedAt ?? ''} onChange={e => field('publishedAt', e.target.value)} /></label><label>수정 시각 (고급)<input placeholder="자동 설정 · ISO 8601 +09:00" value={data.updatedAt ?? ''} onChange={e => field('updatedAt', e.target.value)} /></label><label>이전 주소 (한 줄에 하나)<textarea value={(data.aliases ?? []).join('\n')} onChange={e => field('aliases', e.target.value.split('\n').filter(Boolean))} /></label></>}
       </details>

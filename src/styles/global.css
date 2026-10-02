@@ -90,9 +90,14 @@ h3 { font-size: 1.2rem; }
 .pagination span { color: var(--muted); }
 .post-grid { display: grid; grid-template-columns: minmax(0, 720px); max-width: 780px; gap: 0 48px; margin: 70px auto 0; padding: 0 30px; }
 .post-grid.with-toc { max-width: 1130px; grid-template-columns: minmax(0, 720px) 220px; }
-.post-heading { margin-bottom: 48px; }
+.post-heading { margin-bottom: 32px; }
 .post-heading h1 { margin: 16px 0 20px; font-size: clamp(2rem, 4vw, 2.9rem); }
 .post-description { font-size: 1.06rem; color: var(--muted); padding-top: 22px; border-top: 1px solid var(--line); margin-top: 28px; }
+.post-description { margin-bottom: 0; }
+.post-description:empty { padding-top: 0; }
+.post-body > :first-child { margin-top: 0; }
+.back-to-top { position: fixed; right: max(22px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); z-index: 11; min-height: 44px; padding: 8px 14px; background: var(--surface-raised); border: 1px solid var(--line); color: var(--text); font: inherit; font-size: .8rem; cursor: pointer; }
+.back-to-top[hidden] { display: none; }
 .prose { font-size: 1.04rem; line-height: 1.95; }
 .prose h2 { margin: 3rem 0 1.2rem; }
 .prose h3 { margin: 2rem 0 .9rem; }
@@ -180,7 +185,9 @@ mory-search input { width: 100%; }
   .toc { position: fixed; top: auto; bottom: max(16px, env(safe-area-inset-bottom)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); z-index: 10; margin: 0; background: var(--surface-raised); border: 1px solid var(--line); padding: 0 16px; }
   .toc details { border-top: 0; }
   .toc nav { max-height: 45dvh; overflow-y: auto; overscroll-behavior: contain; }
-  body:has(.toc) .site-footer { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  body { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  body:has(.toc) { padding-bottom: calc(var(--toc-height, 44px) + 100px + env(safe-area-inset-bottom)); }
+  body:has(.toc) .back-to-top { bottom: calc(var(--toc-height, 44px) + 32px + env(safe-area-inset-bottom)); }
   .post-body { grid-row: 3; }
   .post-afterword { grid-row: 4; }
 }

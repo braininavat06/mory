@@ -1,5 +1,15 @@
 import { z } from 'zod';
 export const routeId = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, '소문자 영문/숫자와 하이픈을 사용하세요.');
+export function validationMessage(error: unknown): string {
+  if (!(error instanceof z.ZodError)) return error instanceof Error ? error.message : String(error);
+  const labels: Record<string, string> = { slug: '글 주소 (slug)', aliases: '이전 주소', title: '제목', category: '분류', publishedAt: '최초 게시 시각', updatedAt: '수정 시각' };
+  return error.issues.map(issue => {
+    const field = String(issue.path[0] ?? '콘텐츠');
+    const label = labels[field] ?? field;
+    const message = issue.code === 'too_small' && field === 'title' ? '제목을 입력해 주세요.' : issue.message;
+    return `${label}${issue.path.length > 1 ? ` (${issue.path.slice(1).join('.')})` : ''}: ${message}`;
+  }).join('\n');
+}
 export const ulid = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/, '유효한 ULID가 필요합니다.');
 const optionalDate = z.preprocess(value => value === '' || value === null ? undefined : value,
   z.union([z.iso.date(), z.iso.datetime({ offset: true }).refine(v => /[+-]\d{2}:\d{2}$/.test(v), 'timezone offset이 필요합니다.')]).optional());

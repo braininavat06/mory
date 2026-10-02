@@ -1,5 +1,6 @@
 ---
 import Search from '../components/Search.astro';
+import BackToTop from '../components/BackToTop.astro';
 import { SITE, SITE_NAME, SITE_DESCRIPTION } from '../lib/config.ts';
 import '../styles/global.css';
 interface Props { title?: string; description?: string; canonical?: string; noindex?: boolean; redirect?: string; type?: 'website' | 'article'; publishedAt?: string; updatedAt?: string }
@@ -67,5 +68,6 @@ const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.path
     import '../scripts/client.ts';
     import '../scripts/search.ts';
   </script>
+  <BackToTop />
 </body>
 </html>
