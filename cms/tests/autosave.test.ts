@@ -7,7 +7,7 @@ function fixture() {
  let now=0, next=0;const timers=new Map<number,{at:number;fn:()=>void}>();
  const clock:Clock={now:()=>now,set:(fn,delay)=>{const id=++next;timers.set(id,{fn,at:now+delay});return id;},clear:id=>{timers.delete(id);}};
  const tick=async(ms:number)=>{const end=now+ms;while(true){const item=[...timers.entries()].filter(([,v])=>v.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!item)break;now=item[1].at;timers.delete(item[0]);item[1].fn();await new Promise(r=>setImmediate(r));}now=end;};
- const storage=new Map<string,string>();const local={getItem:(k:string)=>storage.get(k)??null,setItem:(k:string,v:string)=>{storage.set(k,v);},removeItem:(k:string)=>{storage.delete(k);}};
+ const storage=new Map<string,string>();const local={keys:()=>[...storage.keys()],getItem:(k:string)=>storage.get(k)??null,setItem:(k:string,v:string)=>{storage.set(k,v);},removeItem:(k:string)=>{storage.delete(k);}};
  const draft:Draft={kind:'post',id:'test',path:'fixture.md',published:null,base_hash:null,ever_published:false,updated_at:'2026-10-01T12:00:00+09:00',status:'초안',key:'post:test',value:{data:{title:'初'},body:''},revision:20,saved_at:'2026-10-01T12:00:00+09:00'};
  let saved=structuredClone(draft), calls:Payload[]=[];
  const engine=new Autosave(draft,async(revision,value)=>{assert.equal(revision,saved.revision);calls.push(structuredClone(value));saved={...saved,revision:revision+1,value,saved_at:'2026-10-01T15:42:00+09:00'};return saved;},()=>{},local,clock);
@@ -34,3 +34,12 @@ test('recovery detection survives clock skew and newer server revisions, never a
  const f=fixture();f.local.setItem(f.engine.recoveryKey,JSON.stringify({revision:19,at:1,value:{data:{title:'미저장'},body:'복구'}}));
  assert.equal(f.engine.recovery()?.value.body,'복구');assert.equal(f.engine.value.body,'');assert.equal(f.calls.length,0);f.engine.dispose();
 });
+
+test('multi-tab recovery is isolated; stale save retains B while A acknowledgement clears only A; reload and orphan recovery work',async()=>{
+ const f=fixture(),draft=f.engine.draft;let server=draft;
+ const save=async(rev:number,value:Payload)=>{if(rev!==server.revision)throw Object.assign(new Error('conflict'),{status:409});server={...server,revision:rev+1,value};return server;};
+ const a=new Autosave(draft,save,()=>{},f.local,f.clock,'A'),b=new Autosave(draft,save,()=>{},f.local,f.clock,'B');
+ a.change({data:{title:'A'},body:'A'});b.change({data:{title:'B'},body:'B'});await a.flush();assert.equal(f.local.getItem(a.recoveryKey),null);assert.ok(f.local.getItem(b.recoveryKey));await assert.rejects(b.flush());assert.equal(b.state,'conflict');assert.ok(f.local.getItem(b.recoveryKey));
+ const reload=new Autosave(server,save,()=>{},f.local,f.clock,'B');assert.equal(reload.recovery()?.value.body,'B');const crash=new Autosave(server,save,()=>{},f.local,f.clock,'new-session');assert.equal(crash.recovery()?.value.body,'B');crash.dismissRecovery(crash.recovery()!);assert.ok(f.local.getItem(b.recoveryKey));assert.equal(crash.recovery(),null);a.dispose();b.dispose();reload.dispose();crash.dispose();f.engine.dispose();
+});
+test('wrong acknowledgement revision never removes emergency input',async()=>{const f=fixture();f.engine.save=async(_revision,value)=>({...f.engine.draft,revision:999,value});f.engine.change({data:{},body:'keep'});await assert.rejects(f.engine.flush());assert.ok(f.local.getItem(f.engine.recoveryKey));assert.equal(f.engine.state,'unsaved');f.engine.dispose();});

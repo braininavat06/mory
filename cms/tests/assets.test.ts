@@ -22,6 +22,7 @@ import { CmsError } from "../shared.ts";
 import { Publisher } from "../server/publish.ts";
 import { createApp } from "../server/app.ts";
 import { renderPreview } from "../server/preview.ts";
+import { ImageMaintenance } from "../server/image-maintenance.ts";
 import { backup, restoreStagedAssets } from "../server/backup.ts";
 import { sanitizeImage, stripImageMetadata } from "../server/image-sanitize.ts";
 import type { ImageStorage, RemoteImage } from "../server/r2.ts";
@@ -39,6 +40,7 @@ class FakeStorage implements ImageStorage {
   heads = 0;
   fail = false;
   crash = false;
+  async delete(key: string) { this.objects.delete(key); }
   async head(key: string) {
     this.heads++;
     return this.objects.get(key) ?? null;
@@ -476,11 +478,11 @@ test("Archive/Restore use public A, preserve unposted Aprime and its image, and 
       .find((d) => d.kind === "post" && d.value.data.status === "published")!;
     const key = post.key;
     const old = await upload(f, key);
-    body(f, key, `public A\n![[${old.filename}]]`);
+    body(f, key, `public A\n\n![[${old.filename}]]\n::alt[공개 이미지]\n::caption[**공개** 설명]`);
     await publish(f, key);
     post = f.store.get(key);
     const staged = await upload(f, key);
-    body(f, key, `draft Aprime\n![[${staged.filename}]]`);
+    body(f, key, `draft Aprime\n\n![[${staged.filename}]]\n::alt[미게시 이미지]\n::caption[**변경된** 설명]`);
     const puts = f.r2.puts;
     assert.equal((await publish(f, key, "archive")).state, "deploying");
     post = f.store.get(key);
@@ -488,6 +490,12 @@ test("Archive/Restore use public A, preserve unposted Aprime and its image, and 
     assert.match(post.published!.body, /public A/);
     assert.doesNotMatch(post.published!.body, /Aprime/);
     assert.equal(f.r2.puts, puts);
+    const gc = new ImageMaintenance(f.assets);
+    await gc.gc(new Date('2026-10-03T12:00:00Z'));
+    assert.equal(f.assets.get(old.id)!.r2_orphaned_at,null);
+    assert.equal(f.assets.get(staged.id)!.staged_orphaned_at,null);
+    assert.match(post.published!.body,/공개 이미지/);
+    assert.match(post.value.body,/미게시 이미지/);
     await publish(f, key, "restore");
     post = f.store.get(key);
     assert.equal(post.status, "수정 중");
@@ -497,7 +505,15 @@ test("Archive/Restore use public A, preserve unposted Aprime and its image, and 
     await publish(f, key, "delete");
     assert.equal(f.r2.objects.size, 1);
     assert.ok(f.assets.get(old.id));
-    assert.equal(f.assets.get(staged.id), undefined);
+    assert.ok(f.assets.get(staged.id)!.local_path); // Seven-day staged orphan grace.
+    f.store.db.prepare("UPDATE publish_jobs SET state='complete'").run();
+    await gc.gc(new Date('2026-10-04T12:00:00Z'));
+    await gc.gc(new Date('2026-10-11T12:00:00Z'));
+    assert.equal(f.assets.get(staged.id)!.local_path,null);
+    assert.equal(f.r2.objects.size,1);
+    await gc.gc(new Date('2026-11-04T12:00:00Z'));
+    assert.equal(f.r2.objects.size,0);
+    assert.ok(f.assets.get(old.id)!.r2_deleted_at);
   } finally {
     f.close();
   }

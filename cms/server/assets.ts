@@ -13,8 +13,10 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import sanitizeHtml from "sanitize-html";
 import { ulid } from "ulid";
 import {
+  PUBLIC_ASSET_BASE,
   ownerKey,
   managedImage,
   managedCandidate,
@@ -32,6 +34,7 @@ import {
   IMAGE_MAX_BYTES,
   IMAGE_MAX_PIXELS,
 } from "./image-sanitize.ts";
+import { lifecycle, lifecycleSync } from "./lifecycle-lock.ts";
 import { R2Storage } from "./r2.ts";
 import type { ImageStorage, RemoteImage } from "./r2.ts";
 export interface Asset {
@@ -51,6 +54,7 @@ export interface Asset {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  staged_orphaned_at?: string | null; r2_orphaned_at?: string | null; local_deleted_at?: string | null; r2_deleted_at?: string | null;
 }
 export function imageOwner(row: Draft): AssetOwner {
   if (row.kind !== "post" && row.kind !== "page")
@@ -92,7 +96,7 @@ export class Assets {
       throw new CmsError(404, "저장된 이미지 파일이 없습니다.");
     const file = resolve(this.store.runtime, asset.local_path),
       root = resolve(this.store.runtime, "uploads");
-    if (!file.startsWith(root + sep))
+    if (!file.startsWith(root + sep) || relative(root,file).split(sep).join('/') !== ownerKey({type:asset.owner_type,id:asset.owner_id},asset.filename))
       throw new CmsError(400, "이미지 저장 경로를 확인할 수 없습니다.");
     return file;
   }
@@ -149,13 +153,14 @@ export class Assets {
       if (statSync(clean).size > this.maxBytes)
         throw new CmsError(413, "메타데이터 처리 후 이미지가 너무 큽니다.");
       // Owner may have been deleted during decoding; never resurrect its assets.
-      this.store.get(key);
       const filename = `mory-asset-${id}.${image.extension}`,
         r2key = ownerKey(owner, filename);
       final = join(this.store.runtime, "uploads", r2key);
       mkdirSync(join(final, ".."), { recursive: true, mode: 0o700 });
       await chmod(clean, 0o600);
-      await rename(clean, final);
+      return await lifecycle(this.store.runtime, async () => {
+      this.store.get(key);
+      await rename(clean, final!);
       const now = workspaceTime(),
         asset: Asset = {
           id,
@@ -166,13 +171,13 @@ export class Assets {
             .replace(/[\x00-\x1f\x7f\\/]/g, "_")
             .slice(0, 255),
           mime_type: image.mime,
-          size_bytes: statSync(final).size,
+          size_bytes: statSync(final!).size,
           width: image.width,
           height: image.height,
           sha256: createHash("sha256")
-            .update(readFileSync(final))
+            .update(readFileSync(final!))
             .digest("hex"),
-          local_path: relative(this.store.runtime, final),
+          local_path: relative(this.store.runtime, final!),
           r2_key: r2key,
           r2_uploaded_at: null,
           published_at: null,
@@ -180,7 +185,9 @@ export class Assets {
           updated_at: now,
         };
       this.add(asset);
+      this.store.db.prepare('UPDATE assets SET original_size_bytes=? WHERE id=?').run(size,id);
       return { id, filename, width: asset.width, height: asset.height };
+      });
     } catch (error) {
       if (final) await rm(final, { force: true });
       if (error instanceof CmsError) throw error;
@@ -203,6 +210,7 @@ export class Assets {
     const asset = this.find(owner, filename);
     if (asset?.local_path && existsSync(this.path(asset)))
       return `/api/assets/${asset.id}/content`;
+    if (asset?.r2_deleted_at) throw new CmsError(400, "유예 기간 후 정리된 이미지입니다. 이미지를 다시 선택해 주세요.");
     if (asset?.r2_uploaded_at) return resolveAssetUrl(filename, owner);
     // Public references remain viewable after restoring an old SQLite backup.
     if (published.has(filename)) return resolveAssetUrl(filename, owner);
@@ -211,7 +219,7 @@ export class Assets {
       "미리보기 이미지 파일이 없습니다. 이 문서에 이미지를 다시 업로드해 주세요.",
     );
   }
-  async references(row: Draft, payload: Payload, root = this.store.root) {
+  async references(row: Draft, payload: Payload, root = this.store.root, onPublicKey?: (key:string)=>void) {
     const content = readContent(root);
     if (row.kind === "post")
       content.posts = [
@@ -229,7 +237,19 @@ export class Assets {
         },
       ];
     const names = new Set<string>();
+    const publicUrl = (raw:string) => {
+      if(!onPublicKey || !/^(https?:)?\/\//.test(raw)) return;
+      try {
+        const url=new URL(raw,PUBLIC_ASSET_BASE);
+        if(url.origin!==PUBLIC_ASSET_BASE) return;
+        const parts=url.pathname.split('/').slice(1).map(decodeURIComponent);
+        if(parts.length!==3 || !['posts','pages'].includes(parts[0]) || !managedImage(parts[2]))return;
+        onPublicKey(ownerKey({type:parts[0]==='posts'?'post':'page',id:parts[1]},parts[2]));
+      } catch { throw new CmsError(400,'공개 이미지 참조 주소를 확인할 수 없습니다.'); }
+    };
     const options = createMarkdownOptions(content, [], undefined, {
+      onAssetUrl: publicUrl,
+      onAssetHtml: html => { if(onPublicKey) sanitizeHtml(html,{exclusiveFilter: frame => { if(frame.tag==='img' && frame.attribs.src) publicUrl(frame.attribs.src); return false; }}); },
       onEmbed: (filename) => {
         if (managedCandidate(filename)) {
           if (!managedImage(filename))
@@ -404,46 +424,29 @@ export class Assets {
   }
   cleanup() {
     if (this.store.backupActive) return;
-    for (const asset of this.store.db
-      .prepare(
-        "SELECT * FROM assets WHERE owner_type='post' AND r2_uploaded_at IS NULL AND NOT EXISTS (SELECT 1 FROM drafts WHERE kind='post' AND id=assets.owner_id)",
-      )
-      .all() as Asset[]) {
-      try {
-        if (asset.local_path) rmSync(this.path(asset), { force: true });
-        this.store.db.prepare("DELETE FROM assets WHERE id=?").run(asset.id);
-      } catch {
-        console.warn("CMS orphan staged image cleanup deferred");
-      }
-    }
+    try { lifecycleSync(this.store.runtime, () => this.cleanupPublished()); }
+    catch { console.warn('CMS image cleanup deferred until lifecycle lock is available'); }
+  }
+  private cleanupPublished() {
     for (const asset of this.store.db
       .prepare(
         "SELECT * FROM assets WHERE published_at IS NOT NULL AND r2_uploaded_at IS NOT NULL AND local_path IS NOT NULL",
       )
       .all() as Asset[]) {
       try {
-        rmSync(this.path(asset), { force: true });
-        this.store.db
-          .prepare("UPDATE assets SET local_path=NULL WHERE id=?")
-          .run(asset.id);
+        const file = this.path(asset);
+        // Clear the pointer first: a crash may leave an extra file, never a DB
+        // snapshot pointing at a binary already removed by this cleanup.
+        this.store.db.prepare("UPDATE assets SET local_path=NULL WHERE id=?").run(asset.id);
+        try { rmSync(file, { force:true }); }
+        catch(error) { this.store.db.prepare('UPDATE assets SET local_path=? WHERE id=?').run(asset.local_path,asset.id); throw error; }
       } catch {
         console.warn("CMS published image cleanup deferred");
       }
     }
   }
-  deleteStaged(row: Draft) {
-    if (row.kind !== "post" || this.store.backupActive) return;
-    for (const asset of this.store.db
-      .prepare(
-        "SELECT * FROM assets WHERE owner_type=? AND owner_id=? AND r2_uploaded_at IS NULL",
-      )
-      .all("post", row.id) as Asset[]) {
-      try {
-        if (asset.local_path) rmSync(this.path(asset), { force: true });
-        this.store.db.prepare("DELETE FROM assets WHERE id=?").run(asset.id);
-      } catch {
-        console.warn("CMS staged image cleanup deferred");
-      }
-    }
+  deleteStaged(_row: Draft) {
+    // Permanent delete no longer destroys staged assets immediately. Maintenance
+    // sees the missing owner and starts the same seven-day orphan grace period.
   }
 }

@@ -21,13 +21,19 @@ export async function renderPreview(store: Store, key: string, value: Payload, t
     const index = content.posts.findIndex(p => p.data.id === row.id);
     if (index >= 0) content.posts[index] = post; else content.posts.push(post);
   }
+  // Draft dimensions come from the same immutable asset metadata that publish
+  // writes into frontmatter; the static site never needs SQLite or R2.
+  const dimensions = Object.fromEntries((store.db.prepare('SELECT filename,width,height FROM assets WHERE owner_type=? AND owner_id=?').all(row.kind,row.id) as {filename:string;width:number;height:number}[]).map(a=>[a.filename,{width:a.width,height:a.height}]));
+  value = {...value,data:{...value.data,imageDimensions:{...value.data.imageDimensions,...dimensions}}};
+  if(row.kind==='post') { const post=content.posts.find(p=>p.data.id===row.id)!; post.data=value.data as typeof post.data; }
+  else if(row.kind==='page') content.pages=content.pages.map(p=>p.key===row.id? {...p,data:value.data as typeof p.data,body:value.body}:p);
   const assets = new Assets(store);
   const published = new Set(row.published?.body.includes('mory-asset-') ? await assets.references(row, row.published) : []);
   const options = createMarkdownOptions(content, [rehypePreviewSource], undefined, { assetResolver: (filename,owner) => assets.preview(filename,owner,published) });
   const renderer = await options.processor.createRenderer(options);
   let rendered;
   try { rendered = await renderer.render(value.body, { fileURL: pathToFileURL(resolve(store.root, row.path)), frontmatter: value.data }); }
-  catch(error) { if (String(error).includes('미리보기 이미지 파일이 없습니다.')) throw new CmsError(400, '미리보기 이미지 파일이 없습니다. 이 문서에 이미지를 다시 업로드해 주세요.'); throw error; }
+  catch(error) { if (/::alt|::caption|이미지 설명|이미지 alt|이미지 caption/.test(String(error))) throw new CmsError(400, (error instanceof Error ? error.message : String(error)).replaceAll(store.root + '/', '')); if (String(error).includes('미리보기 이미지 파일이 없습니다.')) throw new CmsError(400, '미리보기 이미지 파일이 없습니다. 이 문서에 이미지를 다시 업로드해 주세요.'); throw error; }
   const safeBody = sanitizeHtml(rendered.code, {
     allowedTags: [...sanitizeHtml.defaults.allowedTags, 'mory-search', 'mark', 'input', 'button', 'form', 'label', 'video', 'source', 'iframe', 'details', 'summary', 'math', 'semantics', 'annotation', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'msubsup', 'mfrac', 'mspace', 'mtext', 'mover', 'munder', 'munderover', 'mtable', 'mtr', 'mtd', 'msqrt', 'mroot', 'mpadded', 'menclose', 'img'],
     allowedAttributes: { '*': ['class', 'id', 'style', 'role', 'aria-*', 'data-*'], a: ['href', 'title'], input: ['type', 'name', 'checked', 'disabled', 'placeholder', 'autocomplete', 'required'], form: ['role'], button: ['type'], img: ['src', 'alt', 'width', 'height', 'loading', 'decoding'], video: ['controls', 'preload', 'width'], source: ['src', 'type'], iframe: ['src', 'title', 'loading', 'allow', 'allowfullscreen', 'referrerpolicy'], math: ['xmlns', 'display'], annotation: ['encoding'] },

@@ -58,7 +58,7 @@ export class DevSync {
       catch { throw new CmsError(400, 'runtime 전체가 Git에서 제외되어야 합니다. .gitignore 설정을 확인해 주세요.'); }
     }
   }
-  async snapshot() {
+  async snapshot(allowContent = false) {
     const staged = await this.git(['diff', '--cached', '--raw', '--no-abbrev', '--no-renames', '-z']);
     const unstaged = await this.git(['diff', '--raw', '--no-abbrev', '--no-renames', '-z']);
     const tracked = [...paths(await this.git(['diff', '--cached', '--name-only', '--no-renames', '-z'])), ...paths(await this.git(['diff', '--name-only', '--no-renames', '-z']))];
@@ -67,7 +67,7 @@ export class DevSync {
     // Managed source files must also be clean when a local ignore rule hides them.
     const sourceFiles = paths(await this.git(['ls-files', '--others', '-z', '--', 'src/content/posts/', 'src/content/pages/', 'src/data/categories.yaml', 'src/data/series.yaml', 'data/series/']));
     const content = [...new Set([...dirty, ...sourceFiles])].filter(managedContent);
-    if (content.length) throw new CmsError(400, `공개 콘텐츠 파일에 로컬 수정이 있어 게시할 수 없습니다. CMS 밖에서 수정한 내용을 먼저 정리해 주세요.\n${content.join('\n')}`);
+    if (!allowContent && content.length) throw new CmsError(400, `공개 콘텐츠 파일에 로컬 수정이 있어 게시할 수 없습니다. CMS 밖에서 수정한 내용을 먼저 정리해 주세요.\n${content.join('\n')}`);
     const files = await Promise.all(dirty.map(async path => {
       const absolute = join(this.store.root, path);
       let stat;
@@ -81,12 +81,12 @@ export class DevSync {
     const index = dirty.length ? await this.git(['ls-files', '--stage', '-z', '--', ...dirty]) : '';
     return { staged, unstaged, untracked, dirty, files, index };
   }
-  async advance(publication?: string) {
+  async advance(publication?: string, deployment = false) {
     this.lastRemote = undefined;
     try {
       await this.inspect();
       const branch = await this.branch(); await this.inspect(branch);
-      const before = await this.snapshot();
+      const before = await this.snapshot(deployment);
       await this.git(['fetch', '--no-recurse-submodules', 'origin', branch]);
       const ref = `refs/remotes/origin/${branch}`;
       const head = (await this.git(['rev-parse', 'HEAD'])).trim();
@@ -94,21 +94,21 @@ export class DevSync {
       this.lastRemote = remote;
       const [ahead] = (await this.git(['rev-list', '--left-right', '--count', `HEAD...${ref}`])).trim().split(/\s+/).map(Number);
       if (ahead) throw new CmsError(400, '로컬 Mory 저장소에 아직 원격에 반영되지 않은 커밋이 있어 게시할 수 없습니다. 해당 작업을 먼저 확인해 주세요.');
-      await this.compatible(remote, this.store.root);
+      if (!deployment) await this.compatible(remote, this.store.root);
       const incoming = paths(await this.git(['diff', '--name-only', '--no-renames', '-z', head, remote]));
       const tracked = new Set(paths(await this.git(['ls-tree', '-r', '--name-only', '-z', head])));
       if (incoming.some(path => path.startsWith('runtime/'))) throw new CmsError(400, '원격 저장소에서 runtime 실행 데이터를 추적하고 있습니다. 원격 콘텐츠를 먼저 확인해 주세요.');
       if (incoming.some(path => !tracked.has(path) && existsSync(join(this.store.root, path)))) throw new CmsError(400, '원격에서 추가된 파일과 로컬 파일이 겹쳐 자동 동기화할 수 없습니다. 로컬 파일을 먼저 확인해 주세요.');
       if (incoming.some(path => before.dirty.some(local => overlaps(path, local)))) throw new CmsError(400, '최신 공개본의 파일과 로컬 작업이 겹쳐 자동 동기화할 수 없습니다. 로컬 작업을 먼저 확인해 주세요.');
       await this.inspect(branch);
-      if ((await this.git(['rev-parse','HEAD'])).trim() !== head || JSON.stringify(await this.snapshot()) !== JSON.stringify(before)) throw new CmsError(400, '검사 중 로컬 작업이 변경되었습니다. 작업을 되돌리지 않았습니다. 상태를 확인하고 다시 시도해 주세요.');
+      if ((await this.git(['rev-parse','HEAD'])).trim() !== head || JSON.stringify(await this.snapshot(deployment)) !== JSON.stringify(before)) throw new CmsError(400, '검사 중 로컬 작업이 변경되었습니다. 작업을 되돌리지 않았습니다. 상태를 확인하고 다시 시도해 주세요.');
       if (head !== remote) {
         // This is the only working-tree mutation allowed in the development repo.
         // Disable configured autostash and post-merge hooks for this invocation.
         await this.git(['-c', `core.hooksPath=${join(this.store.runtime, 'no-hooks')}`, 'merge', '--ff-only', '--no-autostash', remote]);
       }
       await this.inspect(branch);
-      if (JSON.stringify(await this.snapshot()) !== JSON.stringify(before)) throw new CmsError(400, '동기화 중 로컬 작업 상태가 변경되었습니다. 작업을 되돌리지 않았습니다. 상태를 확인해 주세요.');
+      if (JSON.stringify(await this.snapshot(deployment)) !== JSON.stringify(before)) throw new CmsError(400, '동기화 중 로컬 작업 상태가 변경되었습니다. 작업을 되돌리지 않았습니다. 상태를 확인해 주세요.');
       if ((await this.git(['rev-parse', 'HEAD'])).trim() !== remote) throw new CmsError(400, '동기화 중 로컬 커밋이 변경되었습니다. 현재 작업을 확인해 주세요.');
       if (publication) {
         try { await this.git(['merge-base', '--is-ancestor', publication, 'HEAD']); }

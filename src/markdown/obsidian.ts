@@ -24,7 +24,8 @@ function youtubeId(raw: string): string | undefined {
   } catch { return; }
 }
 export interface BrokenWikilink { target: string; label: string; line: number }
-export function remarkObsidian(options: { content?: Content; onBrokenWikilink?: (link: BrokenWikilink) => void; onEmbed?: (filename: string) => void; assetResolver?: (filename: string, owner?: AssetOwner) => string } = {}) {
+export function remarkObsidian(this: any, options: { content?: Content; onBrokenWikilink?: (link: BrokenWikilink) => void; onEmbed?: (filename: string) => void; onAssetUrl?: (url: string) => void; onAssetHtml?: (html: string) => void; assetResolver?: (filename: string, owner?: AssetOwner) => string } = {}) {
+  const parseInline = (source: string) => { const first = (this.parse(source) as Root).children[0]; return first?.type === 'paragraph' ? first.children : [{type:'text' as const,value:source}]; };
   return (tree: Root, file: VFile) => {
     const content = options.content ?? readContent();
     const path = (file.path ?? '').replace(/\\/g, '/');
@@ -32,8 +33,62 @@ export function remarkObsidian(options: { content?: Content; onBrokenWikilink?: 
     const page = content.pages.find(p => path.endsWith(p.file));
     const owner: AssetOwner | undefined = current ? { type: 'post', id: current.data.id } : page && ['home', 'about'].includes(page.key) ? { type: 'page', id: page.key } : undefined;
     const source = String(file.value);
+    visit(tree,'image', node => { options.onAssetUrl?.(node.url); });
+    visit(tree,'html', node => { options.onAssetHtml?.(node.value); });
+    const dimensions = current?.data.imageDimensions ?? page?.data.imageDimensions ?? {};
+    function imageHtml(target: string, label?: string, alt = '') {
+      let url: string;
+      try { options.onEmbed?.(target); url = (options.assetResolver ?? resolveAssetUrl)(target, owner); }
+      catch(error) { file.fail(error instanceof Error ? error.message : String(error), undefined, 'mory:asset'); }
+      const d = dimensions[target], width = label ? Number(label) : d?.width;
+      const height = d && width ? Math.max(1,Math.round(d.height * width / d.width)) : undefined;
+      return `<img src="${escapeHtml(url!)}" alt="${escapeHtml(alt)}"${width ? ` width="${width}"` : ''}${height ? ` height="${height}"` : ''} loading="lazy" decoding="async" />`;
+    }
+    function plain(nodes: any[]): string { return nodes.map(n => n.type === 'html' ? '' : n.type === 'image' ? n.alt ?? '' : n.children ? plain(n.children) : n.value ?? '').join(''); }
+    function directive(line: string) {
+      const m = /^::(alt|caption)\[/.exec(line); if(!m) return null;
+      let depth=1, escaped=false, end=-1;
+      for(let i=m[0].length;i<line.length;i++) { const c=line[i]; if(escaped){escaped=false;continue;} if(c==='\\'){escaped=true;continue;} if(c==='[')depth++; if(c===']' && --depth===0){end=i;break;} else if(c!==']') { /* balance handled above */ } }
+      if(end<0 || line.slice(end+1).trim()) file.fail('이미지 설명 문법의 대괄호를 확인하세요. ::alt[설명] 또는 ::caption[설명] 형식입니다.', undefined, 'mory:image-metadata');
+      return {kind:m[1],value:line.slice(m[0].length,end)};
+    }
     visit(tree, 'paragraph', (node, index, parent) => {
-      const raw = node.position ? source.slice(node.position.start.offset, node.position.end.offset).trim() : '';
+      const raw = node.position ? source.slice(node.position.start.offset,node.position.end.offset).trim() : '';
+      const lines = raw.split(/\r?\n/).map(l=>l.replace(/^(?:[ \t]*>[ \t]?)+/,'').trimStart());
+      const isDirective = (line: string) => /^::(?:alt|caption)(?:\[|$)/.test(line);
+      if (!lines.some(isDirective) || !parent || typeof index !== 'number') return;
+      const replacement: any[] = [], pending: string[] = [];
+      const flush = () => {
+        if(!pending.length) return;
+        const raw = pending.splice(0).join('\n');
+        for(const child of (this.parse(raw) as Root).children) { child.position=undefined; child.data={...child.data,moryRaw:raw}; replacement.push(child); }
+      };
+      for(let line=0;line<lines.length;line++) {
+        if(isDirective(lines[line])) file.fail('::alt와 ::caption은 이미지 바로 다음 줄에 붙여 쓰세요. 사이에 빈 줄을 넣지 마세요.',node.position,'mory:image-metadata');
+        const embed = /^!\[\[([^\]\n]+)\]\]$/.exec(lines[line]);
+        if(!embed || !isDirective(lines[line+1] ?? '')) { pending.push(lines[line]); continue; }
+        flush();
+        const imageLine = line;
+        const [target,width] = embed[1].split('|');
+        if(!/\.(?:png|jpe?g|gif|webp|avif|svg)$/i.test(target)) file.fail('alt/caption은 이미지에만 사용할 수 있습니다.',node.position,'mory:image-metadata');
+        if(width !== undefined && !/^[1-9]\d*$/.test(width)) file.fail('이미지 너비는 양의 정수여야 합니다.',node.position,'mory:image-metadata');
+        const fields:Record<string,string>={};
+        while(isDirective(lines[line+1] ?? '')) {
+          const d=directive(lines[++line]);
+          if(!d) file.fail('이미지 설명은 ::alt[설명], ::caption[설명] 형식으로 작성하세요.',node.position,'mory:image-metadata');
+          if(Object.hasOwn(fields,d!.kind)) file.fail(`이미지 ${d!.kind} 설명을 두 번 작성했습니다. 하나만 남기세요.`,node.position,'mory:image-metadata');
+          fields[d!.kind]=d!.value;
+        }
+        const caption = fields.caption !== undefined ? parseInline(fields.caption) : undefined;
+        const position=node.position ? structuredClone(node.position) : undefined;
+        if(position) { position.start.line=node.position!.start.line+imageLine; position.end.line=node.position!.start.line+line; }
+        const img = {type:'html',position,value:imageHtml(target,width,fields.alt ?? (caption ? plain(caption) : ''))};
+        replacement.push(caption ? {type:'paragraph',position,data:{hName:'figure',hProperties:{className:['image-figure']}},children:[img,{type:'emphasis',data:{hName:'figcaption'},children:caption}]} : {type:'paragraph',position,children:[img]});
+      }
+      flush();parent.children.splice(index,1,...replacement);return index+replacement.length;
+    });
+    visit(tree, 'paragraph', (node, index, parent) => {
+      const raw = (node.data as {moryRaw?:string})?.moryRaw ?? (node.position ? source.slice(node.position.start.offset, node.position.end.offset).trim() : '');
       // Only a literal URL paragraph qualifies, never an authored Markdown link.
       const id = /^https?:\/\/\S+$/.test(raw) ? youtubeId(raw) : undefined;
       if (id && parent && typeof index === 'number') {
@@ -69,13 +124,13 @@ export function remarkObsidian(options: { content?: Content; onBrokenWikilink?: 
             if (!['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg', 'mp4', 'webm'].includes(extension ?? '')) file.fail(`지원하지 않는 첨부파일 형식: ${target}`, text.position, 'mory:asset');
             if (label !== undefined && !/^[1-9]\d*$/.test(label)) file.fail(`첨부파일 너비는 양의 정수여야 합니다: ${match[0]}`, text.position, 'mory:asset');
             let url: string;
-            try { options.onEmbed?.(target); url = (options.assetResolver ?? resolveAssetUrl)(target, owner); }
+            try { if (['mp4','webm'].includes(extension!)) { options.onEmbed?.(target); url = (options.assetResolver ?? resolveAssetUrl)(target, owner); } }
             catch (error) { file.fail(error instanceof Error ? error.message : String(error), text.position, 'mory:asset'); }
             const width = label ? ` width="${label}"` : '';
             const name = target.split('/').pop()!;
             result.push({ type: 'html', value: ['mp4', 'webm'].includes(extension!)
               ? `<video controls preload="metadata"${width} aria-label="${escapeHtml(name)}"><source src="${escapeHtml(url!)}" type="video/${extension}"><a href="${escapeHtml(url!)}">${escapeHtml(name)} 다운로드</a></video>`
-              : `<img src="${escapeHtml(url!)}" alt="${escapeHtml(name)}"${width} loading="lazy" decoding="async" />` });
+              : imageHtml(target,label) });
           } else {
             const post = content.posts.find(p => p.data.slug === target);
             if (!post) {

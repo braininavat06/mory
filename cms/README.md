@@ -165,7 +165,7 @@ Site 및 CMS test는 실제 사이트·임시 bare Git remote·SQLite·가상 ti
 - PUT 성공 직후 `r2_uploaded_at`을 기록합니다. PUT 직후 중단돼도 HEAD metadata로 복구합니다. R2 성공 후 Git 실패 시 object와 local file은 유지됩니다. Git push 성공 후 publication 상태를 확정하고 local file을 정리합니다. 정리/상태 기록 중단은 게시를 rollback하지 않으며 시작 시 재확인합니다.
 - 보관·복원은 마지막 공개 snapshot을 사용하며 현재 미게시 본문과 staged image를 유지합니다. image reference 제거/보관/영구삭제는 R2 object를 삭제하지 않습니다. 영구삭제된 글의 미업로드 staged file만 정리하며 공개 object는 향후 명시적 cleanup 대상입니다.
 - asset row가 사라졌어도 해당 문서의 마지막 공개 Markdown이 참조하던 파일은 HEAD metadata를 검증해 재등록할 수 있습니다. 다른 문서의 파일이나 아직 게시되지 않은 unknown 파일에는 적용하지 않습니다.
-- SQLite backup과 함께 미게시 바이너리를 `runtime/backups/assets/<sha256>`에 hardlink(불가능하면 copy)하고 `<date>.assets.json`이 참조합니다. 같은 파일은 날짜마다 중복 복사하지 않습니다. 7일 daily/이전 8주 weekly retention에 따라 더 이상 참조하지 않는 backup blob을 정리합니다. SQLite backup 복구 후 시작할 때 누락된 local 파일을 hash 검증한 backup blob에서 복구합니다. 그날 이미 생성된 backup은 다시 쓰지 않으므로 마지막 일일 backup 이후 작업은 다음 backup까지 포함되지 않습니다.
+- SQLite backup과 함께 미게시 바이너리를 `runtime/backups/assets/<sha256>`에 hardlink(불가능하면 copy)하고 `<date>.assets.json`이 참조합니다. 같은 파일은 날짜마다 중복 복사하지 않습니다. 7일 daily/이전 8주 weekly retention에 따라 더 이상 참조하지 않는 backup blob을 정리합니다. SQLite backup 복구 후 시작할 때 누락된 local 파일을 hash 검증한 backup blob에서 복구합니다. 자동 daily backup은 그날 이미 생성된 snapshot을 재사용합니다. 수동 `npm run cms:backup`은 실행할 때마다 fresh snapshot을 만듭니다.
 
 서버 전용 `.env` 변수: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL`. 선택 제한: `MORY_IMAGE_MAX_BYTES`, `MORY_IMAGE_MAX_PIXELS`. 프런트엔드에 `VITE_` 이름으로 넣지 않습니다. R2 설정이 없어도 이미지 없는 작성/자동저장/게시가 동작하며 R2가 필요한 게시에서만 오류가 납니다. 선택한 파일은 게시 전까지 R2에 공개되지 않습니다. R2 공개 호스트 변경 시 `src/lib/assets.ts`의 public base와 서버 설정을 함께 변경합니다.
 
@@ -178,3 +178,36 @@ npx tsx cms/scripts/r2-smoke.ts
 ```
 
 `_cms-test/<random-ulid>.png` 하나를 업로드해 HEAD/hash/public GET/MIME/cache header를 확인하고 삭제합니다. 실제 글 object는 건드리지 않습니다. 자격증명/원본 AWS 예외는 출력하지 않습니다. CDN을 별도로 캐싱하도록 설정한 환경에서는 object 삭제와 이미 캐시된 응답의 만료가 다를 수 있습니다.
+
+
+## Recovery / 이미지 수명 / 백업 보호
+
+- Emergency recovery는 문서 + 브라우저 탭 세션별로 저장합니다. reload는 같은 세션을 재사용하고 새 탭/복구된 브라우저는 이전 세션 사본도 선택할 수 있습니다. 저장 성공은 그 탭이 전송한 revision에 대응하는 사본만 제거합니다. 다른 탭 사본은 자동 병합·삭제하지 않으며, “서버 내용 유지”는 해당 탭의 확인 기록만 남깁니다.
+- `runtime/lifecycle-lock.sqlite`는 데이터 저장용 DB가 아니라 기존 SQLite의 OS 파일 잠금을 이용한 프로세스 간 coordination입니다. manual/automatic backup, 이미지 등록·삭제, GC 최종 참조 확인, 콘텐츠 저장이 같은 잠금을 사용합니다. live lock을 시간으로 만료시키지 않으며 프로세스 종료 시 OS가 해제합니다. 외부 DB/서비스는 필요 없습니다.
+- `npm run cms:backup`은 매번 `YYYY-MM-DD-manual-<timestamp>-<id>.sqlite`와 같은 fresh snapshot을 만듭니다. 자동 백업은 기존 daily 파일을 재사용합니다. 모두 기존 staged SHA256 blob/manifest 복구 형식과 최근 7일·이전 8주 weekly retention을 사용합니다. 수동 snapshot에는 호출 직전까지 성공한 서버 저장이 포함되며 브라우저의 미저장 입력은 포함되지 않습니다.
+- 기존 startup/hourly cycle이 하루 한 번 GC와 integrity audit을 실행합니다. 파일 생성 후 DB 등록과 로컬 파일 삭제도 같은 잠금으로 보호합니다. 로컬 포인터를 먼저 해제하여 crash 후 DB가 이미 지운 파일을 가리키는 순서를 피하고, 남은 파일은 orphan 정리로 처리합니다.
+- Staged orphan: 현재 작업본, 공개본, 보관 글의 마지막 공개본, Home/About, 진행/실패 후 재시도 가능한 publish snapshot, 개발/게시 clone의 Markdown을 검사합니다. 일반 Markdown/HTML의 managed R2 이미지 URL도 공용 parser에서 수집하고, 알려진 managed filename의 코드/CSS 등 literal 언급은 보수적으로 보존합니다. 최초 미사용 판정 후 7일을 기다리고 삭제 직전에 다시 전수검사합니다. 참조가 다시 저장되면 유예 시간을 초기화합니다. 영구 삭제 역시 즉시 staged 파일을 없애지 않습니다.
+- R2 orphan: 같은 보호 대상을 검사하고 최초 판정 후 최소 30일을 기다립니다. 최신 origin과 개발 HEAD가 일치하는지 확인하고 최종 HEAD/hash/size 및 참조 검사를 통과할 때만 DELETE합니다. 실패 시 DB 삭제 상태를 기록하지 않고 다음 cycle에 재시도합니다. DELETE 성공 후 crash한 경우 다음 HEAD의 missing 상태로 확정할 수 있습니다. Git history는 보호 범위에 포함되지 않습니다.
+- GC가 해석/저장소 확인에 실패하면 파일을 보존합니다. GC 실패는 게시·편집을 실패로 처리하지 않습니다. `runtime/image-maintenance.jsonl`에 scanned/referenced/candidates/deleted/deferred/errors와 삭제 ID/path 또는 key/hash/timestamp를 기록합니다. 이 로그에는 credential을 기록하지 않습니다.
+- Integrity audit은 현재 공개 Markdown의 managed image에 HEAD 및 SHA256/size/MIME 검사를 수행합니다. 누락/불일치를 경고하며 Markdown을 바꾸지 않습니다. 게시 직전 검증은 기존처럼 엄격합니다. R2 credential이 없으면 이미지 없는 편집/게시에는 영향이 없고 audit/GC는 경고·보류합니다.
+- R2 GC에는 기존 bucket credential의 `DeleteObject` 권한이 필요합니다. R2 LIST나 별도 cleanup 계정/daemon은 사용하지 않습니다. audit는 DB가 잃은 asset row도 공개 Markdown의 owner 기반 key로 검사합니다.
+- 공개 build는 여전히 SQLite/R2가 필요 없습니다. CMS가 게시 snapshot frontmatter의 선택 필드 `imageDimensions`에 `{filename: {width, height}}`를 기록합니다. renderer는 width 지정 시 비율에 맞춘 height를 계산하고 모든 이미지에 lazy/async를 적용합니다. CMS preview도 동일 parsing/rendering을 쓰며 staged DB metadata로 크기를 보완합니다. 기존 글은 재게시할 때 이 metadata가 채워집니다. 새 업로드에는 `original_size_bytes`도 기록하지만 과거 업로드의 원본 크기는 복원할 수 없습니다.
+- 이미지 설명은 빈 줄 없이 `![[filename|600]]` 다음에 `::alt[대체 설명]`, `::caption[**화면 설명**]` 순서로 작성합니다. 둘 다 선택 사항입니다. caption이 있으면 figure/figcaption을 생성하고, alt가 생략되면 caption의 plain text를 사용합니다. 둘 다 없으면 빈 alt입니다. 중복/단독/깨진 대괄호/사이의 빈 줄은 읽을 수 있는 문법 오류로 안내합니다. CMS 팁에도 예시가 있습니다.
+
+운영 반영은 새 content contract(5)를 지원하는 공개 사이트 배포 후 CMS를 수동 재시작하는 순서입니다. 실행 중인 구버전 CMS와 신버전 manual backup을 혼용하면 새 coordination 보장이 적용되지 않습니다. SQLite schema는 재시작 시 additive migration되며 자동 재시작하지 않습니다. 외부 mirror/NAS/cloud backup과 이미지 변환/미디어 관리 UI는 추가하지 않았습니다.
+
+### Mory 운영 배포
+
+상단 테마 옆 **배포 상태**를 누르면 개발 저장소의 로컬 변경과 `origin/main`에 대응하는 Pages workflow를 확인한다. 조회는 fetch만 수행하며 작업 파일을 바꾸지 않는다.
+
+- 로컬 변경: 제안된 커밋 메시지를 확인/수정한 뒤 **커밋 및 배포**. 현재 변경 전체를 `git add -A`로 반영하며 `.env`와 `runtime/` 추적/ignore 상태를 검사한다.
+- clean + local ahead: **Push 및 배포**. 기존 커밋만 push한다.
+- remote ahead: **안전하게 동기화** 후 다시 판단한다. 기존 dev-sync의 파일 보존 검사와 ff-only를 재사용하며 충돌 시 중단한다.
+- 동일 SHA의 workflow 실패/취소: **다시 배포**는 Actions rerun API만 사용한다. 새 커밋이나 재-push를 만들지 않는다.
+- 동일 SHA 성공: 배포 완료, 추가 작업 없음. 실행 기록이 없으면 잠깐 재조회하고 기록 없음으로 표시한다. 기존 workflow_dispatch는 GitHub에서 수동 실행 가능하며 CMS가 새 커밋으로 이를 우회하지 않는다.
+
+콘텐츠 게시와 운영 배포의 Git 단계는 기존 Publisher 큐에서 서로 차단한다. Actions 대기 중에는 Git 큐를 잠그지 않는다. Backup 패널은 그대로 사용하며 양쪽 모두 실제 Git/GitHub 상태를 기준으로 판단한다. 외부 Backup 작업이 동시에 원격을 바꾸면 normal push가 거절될 수 있다. 커밋은 보존되며 자동 merge/rebase/reset/stash/force 처리하지 않는다.
+
+Git push는 origin의 SSH 인증을 사용한다. Actions 조회/재실행에는 기존 서버 전용 `MORY_GITHUB_TOKEN`을 사용한다. Fine-grained token은 Mory repository의 **Actions: Read and write**가 필요하며 토큰을 브라우저에 전달하지 않는다. 조회 실패와 배포 실패는 별도로 표시한다. 실행 중 polling은 5초, idle은 60초이며 숨긴 탭에서는 조회를 쉬고 창 포커스/콘텐츠 게시 상태 변경 시 다시 조회한다.
+
+코드 반영은 `npm run cms:build` 후 운영 CMS를 **직접 재시작**해야 한다. 자동 재시작/새 서비스는 없다.

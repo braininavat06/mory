@@ -6,4 +6,4 @@ import { backup } from '../server/backup.ts';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 if (existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
 const store = new Store(root, resolve(root, process.env.MORY_RUNTIME_DIR || 'runtime'));
-try { console.log(await backup(store)); } finally { store.close(); }
+try { console.log(await backup(store, new Date(), { manual: true })); } finally { store.close(); }

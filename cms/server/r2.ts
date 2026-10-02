@@ -2,6 +2,7 @@ import {
   S3Client,
   HeadObjectCommand,
   PutObjectCommand,
+  DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { createReadStream } from "node:fs";
 import { CmsError } from "../shared.ts";
@@ -15,6 +16,7 @@ export interface RemoteImage {
 export interface ImageStorage {
   head(key: string): Promise<RemoteImage | null>;
   put(key: string, file: string, image: RemoteImage): Promise<void>;
+  delete?(key: string): Promise<void>;
 }
 export class R2Storage implements ImageStorage {
   private client?: S3Client;
@@ -105,6 +107,11 @@ export class R2Storage implements ImageStorage {
       if (error?.$metadata?.httpStatusCode === 404) return null;
       return this.failure(error, "HEAD");
     }
+  }
+  async delete(key: string) {
+    const client = this.connect();
+    try { await client.send(new DeleteObjectCommand({Bucket:this.bucket,Key:key}), {abortSignal:AbortSignal.timeout(10_000)}); }
+    catch(error) { this.failure(error, 'DELETE'); }
   }
   async put(key: string, file: string, image: RemoteImage) {
     const client = this.connect();

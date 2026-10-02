@@ -1,3 +1,4 @@
+import { lifecycle } from './lifecycle-lock.ts';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { stringify } from 'yaml';
@@ -21,6 +22,16 @@ export class Publisher {
   private checking = new Set<string>();
   private retrying = new Map<string, Promise<PublishJob>>();
   private running = new Set<string>();
+  private deployingCode = false;
+  get gitBusy() { return this.deployingCode || this.running.size > 0 || this.otherGitTasks > 0; }
+  private otherGitTasks = 0;
+  async deployExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.gitBusy) throw new CmsError(423, '콘텐츠 게시 또는 다른 Git 작업이 진행 중입니다. 완료 후 다시 배포하세요.');
+    this.deployingCode = true;
+    const task = this.queue.then(operation);
+    this.queue = task.then(() => {}, () => {});
+    try { return await task; } finally { this.deployingCode = false; }
+  }
   assets: Assets;
   repo: string;
   dev: DevSync;
@@ -33,6 +44,7 @@ export class Publisher {
     return (await gitOutput(args, cwd)).trim();
   }
   request(key: string, revision: number, action: Action = 'publish'): PublishJob {
+    if (this.deployingCode) throw new CmsError(423, 'Mory 변경사항을 반영하는 중입니다. 완료 후 콘텐츠를 게시하세요.');
     const existing = this.store.jobs().find(j => j.key === key && j.revision === revision && j.action === action);
     if (existing) {
       if (existing.state === 'publishing' || (!existing.pushed_at && !['complete', 'deploying'].includes(existing.state))) this.enqueue(existing.id);
@@ -77,6 +89,8 @@ export class Publisher {
   }
   async idle() { await this.queue; }
   async reloadPublic(key: string, revision: number): Promise<Draft> {
+    if (this.deployingCode) throw new CmsError(423, 'Mory 배포 작업 중입니다. 잠시 후 다시 시도하세요.');
+    this.otherGitTasks++;
     const task = this.queue.then(async () => {
       const row = this.store.get(key);
       if (row.revision !== revision) throw new CmsError(409, '서버 작업본이 변경되었습니다. 먼저 최신본을 불러오세요.');
@@ -93,13 +107,12 @@ export class Publisher {
       else if (content.series[row.id]) value = { data: { id: row.id, ...content.series[row.id] }, body: '' };
       if (!value) throw new CmsError(409, '현재 공개본에서 문서를 찾지 못했습니다. 작업본은 보존됩니다.');
       const now = workspaceTime();
-      const updated = this.store.db.prepare('UPDATE drafts SET value=?,published=?,base_hash=?,path=?,revision=revision+1,saved_at=?,updated_at=? WHERE key=? AND revision=?')
-        .run(JSON.stringify(value), JSON.stringify(value), fileHash(this.repo, path), path, now, now, key, revision);
+      const updated = await lifecycle(this.store.runtime, () => this.store.db.prepare('UPDATE drafts SET value=?,published=?,base_hash=?,path=?,revision=revision+1,saved_at=?,updated_at=? WHERE key=? AND revision=?').run(JSON.stringify(value), JSON.stringify(value), fileHash(this.repo, path), path, now, now, key, revision));
       if (!updated.changes) throw new CmsError(409, '다른 창에서 저장한 내용이 있습니다.');
       return this.store.get(key);
     });
     this.queue = task.then(() => {}, () => {});
-    return task;
+    return task.finally(() => { this.otherGitTasks--; });
   }
   async compatible(sha: string, cwd: string) {
     const schema = await this.git(['show', `${sha}:src/lib/schema.ts`], cwd);
@@ -113,9 +126,11 @@ export class Publisher {
     if (!/^\/runtime\/\r?$/m.test(ignore)) throw new CmsError(400, '최신 코드에서도 runtime 전체가 Git에서 제외되어야 합니다. 원격 .gitignore 설정을 확인해 주세요.');
   }
   async retryLocalSync(): Promise<LocalSync | null> {
+    if (this.deployingCode) throw new CmsError(423, 'Mory 배포 작업 중입니다. 잠시 후 다시 시도하세요.');
+    this.otherGitTasks++;
     const task = this.queue.then(() => this.dev.recover());
     this.queue = task.then(() => {}, () => {});
-    return task;
+    return task.finally(() => { this.otherGitTasks--; });
   }
   async sync() {
     if (!existsSync(join(this.repo, '.git'))) {
@@ -156,7 +171,7 @@ export class Publisher {
       const row = this.store.get(job.key);
       // Never-published archived drafts need no public file, validation or network.
       if (!row.published && ((row.kind === 'post' && ['archive', 'restore', 'delete'].includes(job.action)) || (row.kind === 'series' && job.action === 'delete'))) {
-        this.completeLocal(row, job); return;
+        await lifecycle(this.store.runtime, () => this.completeLocal(row, job)); return;
       }
       // Recovery of an acknowledged-late push must not become a failed
       // publication just because the development checkout is now blocked.
@@ -174,7 +189,11 @@ export class Publisher {
         const base = await this.git(['rev-parse', `origin/${branch}`]);
         await this.compatible(base, this.repo);
         this.targetBases(row, job);
-        if (job.action === 'publish' && ['post','page'].includes(row.kind)) await this.assets.prepare(row, job.snapshot, this.repo);
+        if (job.action === 'publish' && ['post','page'].includes(row.kind)) {
+          const names = await this.assets.prepare(row, job.snapshot, this.repo);
+          job.snapshot.data.imageDimensions = Object.fromEntries(names.map(name => { const asset = this.assets.find({type:row.kind as 'post'|'page',id:row.id},name)!; return [name,{width:asset.width,height:asset.height}]; }));
+          this.store.db.prepare('UPDATE publish_jobs SET snapshot=? WHERE id=?').run(JSON.stringify(job.snapshot),job.id);
+        }
         const touched = [row.path];
         const seriesChanges: { id: string; path: string; payload: Payload }[] = [];
         if (row.kind === 'categories') this.store.assertCategoriesDeletedSafely(row.published?.data ?? {}, job.snapshot.data);
@@ -240,7 +259,7 @@ export class Publisher {
     // A recovered acknowledgement can be found below newer remote commits.
     // Record hashes from this publication, never from a later external edit.
     if (await this.git(['rev-parse', 'HEAD']) !== sha) await this.git(['reset', '--hard', sha]);
-    this.recordPush(row, job, sha, seriesChanges);
+    await lifecycle(this.store.runtime, () => this.recordPush(row, job, sha, seriesChanges));
     try { await this.assets.published(row, job, this.repo); if(job.action === 'delete') this.assets.deleteStaged(row); } catch { console.warn('CMS image publication bookkeeping deferred'); }
     // recover records failures separately and never throws into publish failure.
     await this.dev.recover();
@@ -310,12 +329,12 @@ export class Publisher {
   }
   resume() { this.queue = this.queue.then(async () => { await this.assets.recoverPublications(); await this.dev.recover(); }); for (const job of this.store.jobs().filter(j => j.state === 'publishing')) this.enqueue(job.id); }
 }
-export function githubRetry(token: string | undefined) {
+export function githubRetry(token: string | undefined, transport: typeof fetch = fetch) {
   if (!token) return undefined;
   return async (url: string) => {
     const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/actions\/runs\/(\d+)$/.exec(url);
     if (!match) throw new Error('Invalid workflow run URL');
-    const response = await fetch(`https://api.github.com/repos/${match[1]}/actions/runs/${match[2]}/rerun`, { method: 'POST', headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'User-Agent': 'Mory-CMS' }, signal: AbortSignal.timeout(15_000) });
+    const response = await transport(`https://api.github.com/repos/${match[1]}/actions/runs/${match[2]}/rerun`, { method: 'POST', headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'User-Agent': 'Mory-CMS' }, signal: AbortSignal.timeout(15_000) });
     if (!response.ok) throw new Error('Deployment retry failed');
   };
 }

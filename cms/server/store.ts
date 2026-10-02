@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { lifecycleSync } from './lifecycle-lock.ts';
 import { mkdirSync, readFileSync, existsSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -43,8 +44,14 @@ export class Store {
         local_path TEXT, r2_key TEXT NOT NULL UNIQUE, r2_uploaded_at TEXT, published_at TEXT,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS assets_owner ON assets(owner_type,owner_id);`);
+    this.db.transaction(() => {
     if (!(this.db.pragma('table_info(publish_jobs)') as {name:string}[]).some(c => c.name === 'pushed_at')) this.db.exec('ALTER TABLE publish_jobs ADD COLUMN pushed_at TEXT');
+    for (const column of ['staged_orphaned_at','r2_orphaned_at','local_deleted_at','r2_deleted_at']) {
+      if (!(this.db.pragma('table_info(assets)') as {name:string}[]).some(c => c.name===column)) this.db.exec(`ALTER TABLE assets ADD COLUMN ${column} TEXT`);
+    }
+    if (!(this.db.pragma('table_info(assets)') as {name:string}[]).some(c => c.name==='original_size_bytes')) this.db.exec('ALTER TABLE assets ADD COLUMN original_size_bytes INTEGER');
     if (!this.db.prepare("SELECT 1 FROM settings WHERE key = 'imported'").get()) this.import();
+    }).immediate();
   }
   import() {
     const content = readContent(this.root);
@@ -80,7 +87,7 @@ export class Store {
     return this.insert(kind, seriesId, `data/series/${seriesId}.yaml`, { data: { id: seriesId, name: '', description: '', posts: [] }, body: '' });
   }
   save(key: string, revision: number, value: Payload, slugChange = false): Draft {
-    return this.db.transaction(() => {
+    return lifecycleSync(this.runtime, () => this.db.transaction(() => {
       const row = this.get(key);
       if (row.revision !== revision) throw new CmsError(409, '서버 최신본이 따로 있습니다. 미저장 내용을 보존하고 자동저장을 멈췄습니다.');
       if (this.db.prepare("SELECT 1 FROM publish_jobs WHERE key=? AND state='publishing'").get(key)) throw new CmsError(423, '게시 내용을 확정하는 중입니다. 잠시 후 다시 저장하세요.');
@@ -105,8 +112,9 @@ export class Store {
       const now = workspaceTime();
       const changed = this.db.prepare('UPDATE drafts SET value=?,revision=revision+1,saved_at=?,updated_at=? WHERE key=? AND revision=?').run(JSON.stringify(value), now, now, key, revision);
       if (!changed.changes) throw new CmsError(409, '다른 창에서 저장한 내용이 있습니다.');
+      this.db.prepare('UPDATE assets SET staged_orphaned_at=NULL,r2_orphaned_at=NULL WHERE instr(?,filename)>0').run(value.body);
       return this.get(key);
-    })();
+    })());
   }
   assertCategoriesDeletedSafely(before: Record<string, any>, after: Record<string, any>) {
     for (const id of Object.keys(before).filter(id => !Object.hasOwn(after, id))) {

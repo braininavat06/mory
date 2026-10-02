@@ -1,3 +1,5 @@
+import { MoryDeployment, githubActions } from './deployment.ts';
+import { lifecycle } from './lifecycle-lock.ts';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { serveStatic } from '@hono/node-server/serve-static';
@@ -13,7 +15,7 @@ import type { Publisher } from './publish.ts';
 import { linkIssues } from './link-issues.ts';
 import { renderPreview } from './preview.ts';
 const keySchema = z.string().regex(/^(post:[0-7][0-9A-HJKMNP-TV-Z]{25}|page:(home|about)|categories:registry|series:[a-z0-9]+(?:-[a-z0-9]+)*)$/);
-export function createApp(store: Store, publisher: Publisher, origin: string) {
+export function createApp(store: Store, publisher: Publisher, origin: string, deployment = new MoryDeployment(publisher, githubActions(publisher.options.remote, process.env.MORY_GITHUB_TOKEN, 'deploy.yml', publisher.options.branch ?? 'main'))) {
   const app = new Hono();
   const previews = new Map<string, { html: string; at: number }>();
   app.use('*', async (c, next) => {
@@ -34,6 +36,11 @@ export function createApp(store: Store, publisher: Publisher, origin: string) {
     if (error instanceof z.ZodError) return c.json({ error: error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join('\n') }, 400);
     console.error('CMS request failed:', error.message); return c.json({ error: '서버 요청을 처리하지 못했습니다. 입력 내용은 이 창에 보존되어 있습니다.' }, 500);
   });
+  app.get('/api/mory-deployment', c => deployment.status(c.req.query('refresh') === '1').then(state => c.json(state)));
+  app.post('/api/mory-deployment', async c => {
+    const input = z.object({ action:z.enum(['commit','push','sync','rerun','none']), fingerprint:z.string().optional(), message:z.string().max(1000).optional() }).parse(await c.req.json());
+    return c.json(await deployment.execute(input));
+  });
   app.get('/api/link-issues', async c => c.json(await linkIssues(store)));
   app.post('/api/uploads/:key', async c => {
     const key=keySchema.parse(c.req.param('key'));
@@ -47,7 +54,7 @@ export function createApp(store: Store, publisher: Publisher, origin: string) {
       c.header('Content-Type',asset.mime_type);c.header('Content-Length',String(asset.size_bytes));
       return c.body(Readable.toWeb(createReadStream(publisher.assets.path(asset))) as ReadableStream);
     }
-    if(asset.r2_uploaded_at)return c.redirect(resolveAssetUrl(asset.filename,{type:asset.owner_type,id:asset.owner_id}));
+    if(asset.r2_uploaded_at && !asset.r2_deleted_at)return c.redirect(resolveAssetUrl(asset.filename,{type:asset.owner_type,id:asset.owner_id}));
     throw new CmsError(404,'이미지 파일이 없습니다. 다시 업로드해 주세요.');
   });
   app.get('/api/health', c => c.json({ service: 'mory-cms', ok: true }));
@@ -59,17 +66,17 @@ export function createApp(store: Store, publisher: Publisher, origin: string) {
   app.get('/api/drafts/:key', c => c.json(store.get(keySchema.parse(c.req.param('key')))));
   app.post('/api/drafts', async c => {
     const data = z.object({ kind: z.enum(['post', 'series']), id: z.string().optional() }).parse(await c.req.json());
-    return c.json(store.create(data.kind, data.id), 201);
+    return c.json(await lifecycle(store.runtime, () => store.create(data.kind, data.id)), 201);
   });
   app.put('/api/drafts/:key', async c => {
     const key = keySchema.parse(c.req.param('key'));
     const input = z.object({ revision: z.number().int().positive(), value: z.object({ body: z.string(), data: z.record(z.string(), z.any()), deleted: z.boolean().optional() }), slugChange: z.boolean().optional() }).parse(await c.req.json());
-    return c.json(store.save(key, input.revision, input.value, input.slugChange));
+    return c.json(await lifecycle(store.runtime, () => store.save(key, input.revision, input.value, input.slugChange)));
   });
   app.post('/api/publish/:key', async c => {
     const key = keySchema.parse(c.req.param('key'));
     const input = z.object({ revision: z.number().int().positive(), action: z.enum(['publish', 'archive', 'restore', 'delete']).default('publish') }).parse(await c.req.json());
-    const { snapshot: _, ...job } = publisher.request(key, input.revision, input.action); return c.json(job, 202);
+    const { snapshot: _, ...job } = await lifecycle(store.runtime, () => publisher.request(key, input.revision, input.action)); return c.json(job, 202);
   });
   app.post('/api/reload-public/:key', async c => {
     const input = z.object({ revision: z.number().int().positive() }).parse(await c.req.json());

@@ -100,3 +100,16 @@ button:disabled, input:disabled { opacity: .55; cursor: default; }
 .link-issue-list ul { margin-block: 12px 20px; }
 .image-upload-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .image-upload-status { padding-left: 20px; font-size: .85rem; overflow-wrap: anywhere; }
+
+.deployment-toggle { font-size: .8rem; padding: 8px 10px; min-height: 44px; white-space: nowrap; max-width: 135px; overflow: hidden; text-overflow: ellipsis; }
+.deployment-dialog { background: var(--surface); color: var(--text); border: 1px solid var(--line); padding: 24px; width: min(540px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; }
+.deployment-dialog::backdrop { background: rgb(0 0 0 / .45); }
+.deployment-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.deployment-heading h2 { margin: 0; font-size: 1.25rem; }
+.deployment-dialog dl { display: grid; grid-template-columns: 100px minmax(0,1fr); gap: 12px; font-size: .9rem; }
+.deployment-dialog dt { color: var(--muted); }
+.deployment-dialog dd { margin: 0; overflow-wrap: anywhere; }
+.deployment-dialog label { display: grid; gap: 8px; }
+.deployment-dialog input { width: 100%; min-width: 0; padding: 10px; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+.deployment-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+@media (max-width: 600px) { .deployment-dialog { padding: 18px; } .deployment-dialog dl { grid-template-columns: 80px minmax(0,1fr); } .deployment-toggle { max-width: 104px; } }

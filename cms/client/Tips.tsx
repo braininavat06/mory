@@ -53,7 +53,8 @@ export function Tips() {
       <p>현재 글의 첨부파일 이름을 적습니다. <code>|600</code>은 너비 600px이며 좁은 화면에서는 화면 폭에 맞춰 줄어듭니다. 동영상은 재생 컨트롤과 함께 표시됩니다.</p>
       <p>지원 이미지: PNG, JPG/JPEG, GIF, WebP, AVIF, SVG. 지원 동영상: MP4, WebM. 너비는 양의 정수만 사용할 수 있습니다.</p>
       <Example>{'![[shared/image.webp]]\n\n![이미지 설명](https://example.com/image.webp)'}</Example>
-      <p>Home/About에서는 <code>shared/</code> 경로를 사용합니다. 일반 Markdown 이미지로 외부 이미지 주소를 넣을 수도 있습니다. CMS에는 업로드 기능이 없으므로 파일은 별도로 준비해야 합니다.</p>
+      <p>Home/About에서는 <code>shared/</code> 경로를 사용합니다. 일반 Markdown 이미지로 외부 이미지 주소를 넣을 수도 있습니다. CMS 이미지 버튼·붙여넣기·끌어놓기로 JPG, PNG, WebP, GIF를 업로드할 수 있습니다. 게시 전에는 서버에만 보관됩니다.</p>
+      <h3>이미지 설명</h3><Example>{'![[image.webp|600]]\n::alt[사진에서 전달하려는 내용]\n::caption[2026년 **진주 남강** 유등축제]'}</Example><p>이미지 바로 다음 줄에 붙여 쓰고 중간에 빈 줄을 넣지 마세요. alt는 대체 설명, caption은 화면에 보이는 설명입니다. 둘 다 선택 사항이며 caption에는 굵게·기울임·링크 같은 inline Markdown을 쓸 수 있습니다. alt가 없으면 caption의 읽을 수 있는 문장을 사용하고, 둘 다 없으면 빈 alt를 사용합니다.</p>
     </section>
     <section>
       <h2>YouTube 영상</h2>

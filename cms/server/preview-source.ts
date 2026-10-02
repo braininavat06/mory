@@ -5,7 +5,7 @@ import type { Root } from 'hast';
 export function rehypePreviewSource() {
   return (tree: Root) => {
     visit(tree, 'element', node => {
-      if (!node.position || !['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'table', 'li', 'blockquote', 'aside', 'img', 'video'].includes(node.tagName)) return;
+      if (!node.position || !['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'table', 'li', 'blockquote', 'aside', 'img', 'video', 'figure'].includes(node.tagName)) return;
       node.properties['data-source-start'] = node.position.start.line;
     });
   };

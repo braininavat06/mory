@@ -13,7 +13,9 @@ import {
 import { join, resolve, sep } from "node:path";
 import { createHash } from "node:crypto";
 import Database from "better-sqlite3";
+import { randomUUID } from "node:crypto";
 import { publicationTime } from "../../src/lib/dates.ts";
+import { lifecycle, lifecycleSync } from "./lifecycle-lock.ts";
 import type { Store } from "./store.ts";
 const sha = (file: string) =>
   createHash("sha256").update(readFileSync(file)).digest("hex");
@@ -26,16 +28,23 @@ function linkOrCopy(from: string, to: string) {
   }
   chmodSync(to, 0o600);
 }
-export async function backup(store: Store, now = new Date()) {
+export async function backup(store: Store, now = new Date(), options: { manual?: boolean } = {}) {
+  return lifecycle(store.runtime, () => takeBackup(store, now, options));
+}
+async function takeBackup(store: Store, now: Date, options: { manual?: boolean }) {
   const dir = join(store.runtime, "backups"),
     blobs = join(dir, "assets");
   mkdirSync(blobs, { recursive: true, mode: 0o700 });
+  // All backup processes hold the same OS lock. Remaining partials can only be
+  // from a crashed process, never from a live concurrent backup.
+  for(const name of readdirSync(dir).filter(n=>n.endsWith('.partial'))) rmSync(join(dir,name),{force:true});
   const day = publicationTime(now).slice(0, 10),
-    target = join(dir, `${day}.sqlite`),
-    manifest = join(dir, `${day}.assets.json`);
+    stem = options.manual ? `${day}-manual-${now.getTime()}-${randomUUID().slice(0,8)}` : day,
+    target = join(dir, `${stem}.sqlite`),
+    manifest = join(dir, `${stem}.assets.json`);
   store.backupActive++;
   try {
-    if (!existsSync(target)) {
+    if (options.manual || !existsSync(target)) {
       const temporary = `${target}.partial`;
       rmSync(temporary, { force: true });
       await store.db.backup(temporary);
@@ -44,7 +53,7 @@ export async function backup(store: Store, now = new Date()) {
       try {
         const assets = snapshot
           .prepare(
-            "SELECT id,sha256,local_path FROM assets WHERE local_path IS NOT NULL AND published_at IS NULL",
+            "SELECT id,sha256,local_path FROM assets WHERE local_path IS NOT NULL",
           )
           .all() as { id: string; sha256: string; local_path: string }[];
         for (const asset of assets) {
@@ -73,7 +82,7 @@ export async function backup(store: Store, now = new Date()) {
     const keptWeeks = new Set<number>(),
       cutoff = Date.parse(`${day}T00:00:00Z`);
     for (const name of readdirSync(dir)
-      .filter((n) => /^\d{4}-\d{2}-\d{2}\.sqlite$/.test(n))
+      .filter((n) => /^\d{4}-\d{2}-\d{2}(?:-manual-\d+-[a-f0-9]+)?\.sqlite$/.test(n))
       .sort()
       .reverse()) {
       const age = Math.floor(
@@ -84,7 +93,7 @@ export async function backup(store: Store, now = new Date()) {
       if (age <= 63 && !keptWeeks.has(week)) keptWeeks.add(week);
       else {
         rmSync(join(dir, name));
-        rmSync(join(dir, `${name.slice(0, 10)}.assets.json`), { force: true });
+        rmSync(join(dir, name.replace(".sqlite", ".assets.json")), { force: true });
       }
     }
     const live = new Set<string>();
@@ -108,7 +117,8 @@ export async function backup(store: Store, now = new Date()) {
 }
 // When restoring cms.sqlite, missing staged binaries can be recovered from the
 // content-addressed backup. Never replace an existing file or invent a DB row.
-export function restoreStagedAssets(store: Store) {
+export function restoreStagedAssets(store: Store) { return lifecycleSync(store.runtime, () => restoreAssets(store)); }
+function restoreAssets(store: Store) {
   for (const asset of store.db
     .prepare(
       "SELECT sha256,local_path FROM assets WHERE local_path IS NOT NULL AND published_at IS NULL",
