@@ -1,1 +1,3 @@
-{}
+test:
+  name: 테스트
+  order: 10
