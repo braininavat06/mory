@@ -137,19 +137,16 @@ MORY_ASSET_BASE=https://img.mory.place
 
 ## 정렬 / 페이지네이션
 
-`src/lib/config.ts`의 `PAGE_SIZE = 20`을 공통으로 사용합니다. 데이터 전체를 정렬한 후 페이지를 나눕니다. 최근 수정순은 `updatedAt ?? publishedAt`이며 날짜가 같은 경우 ULID로 순서를 고정합니다.
+`src/lib/config.ts`의 `PAGE_SIZE = 20`을 공통으로 사용합니다. 데이터 전체를 정렬한 후 페이지를 나눕니다. 최신순·오래된순은 게시 시각을 기준으로 하며, 시각이 같은 경우 ULID로 순서를 고정합니다. 기존 `updated/` 주소는 같은 페이지 번호의 최신순 목록으로 이동합니다.
 
 ```text
 /writing/
 /writing/page/2/
 /writing/oldest/
 /writing/oldest/page/2/
-/writing/updated/
-/writing/updated/page/2/
 /category/<id>/
 /category/<id>/page/2/
 /category/<id>/oldest/page/2/
-/category/<id>/updated/page/2/
 /series/<id>/
 ```
 

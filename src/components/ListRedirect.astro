@@ -1,0 +1,11 @@
+---
+import Base from '../layouts/Base.astro';
+interface Props { destination: string }
+const { destination } = Astro.props;
+---
+<Base title="글 목록으로 이동" canonical={destination} noindex redirect={destination}>
+  <script slot="head" is:inline define:vars={{ destination }}>
+    window.location.replace(destination + window.location.search + window.location.hash);
+  </script>
+  <section class="page-content prose"><h1>글 목록으로 이동합니다.</h1><p><a href={destination}>최신순 글 목록으로</a></p></section>
+</Base>

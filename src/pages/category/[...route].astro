@@ -1,12 +1,19 @@
 ---
 import { readContent, publishedPosts } from '../../lib/content.ts';
-import { listPages, listUrl } from '../../lib/listing.ts';
+import { listPages, listUrl, retiredSortPages } from '../../lib/listing.ts';
 import type { Listing } from '../../lib/listing.ts';
 import ListingLayout from '../../layouts/Listing.astro';
+import ListRedirect from '../../components/ListRedirect.astro';
 export function getStaticPaths() {
   const content = readContent();
-  return Object.entries(content.categories).flatMap(([id, category]) => listPages(publishedPosts(content).filter(p => p.data.category === id), `/category/${id}/`).map(listing => ({ params: { route: listUrl(listing.base, listing.sort, listing.page).slice('/category/'.length).replace(/\/$/, '') }, props: { listing, title: category.name, categoryId: id } })));
+  return Object.entries(content.categories).flatMap(([id, category]) => {
+    const posts = publishedPosts(content).filter(p => p.data.category === id), base = `/category/${id}/`;
+    return [
+      ...listPages(posts, base).map(listing => ({ params: { route: listUrl(base, listing.sort, listing.page).slice('/category/'.length).replace(/\/$/, '') }, props: { listing, title: category.name, categoryId: id } })),
+      ...retiredSortPages(posts, base).map(route => ({ params: { route: route.source.slice('/category/'.length).replace(/\/$/, '') }, props: { destination: route.destination } })),
+    ];
+  });
 }
-interface Props { listing: Listing; title: string; categoryId: string }
+interface Props { listing?: Listing; title?: string; categoryId?: string; destination?: string }
 ---
-<ListingLayout {...Astro.props} />
+{Astro.props.destination ? <ListRedirect destination={Astro.props.destination} /> : <ListingLayout listing={Astro.props.listing!} title={Astro.props.title} categoryId={Astro.props.categoryId} />}

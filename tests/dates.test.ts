@@ -35,7 +35,6 @@ test('unquoted YAML dates, rendering, sorting, and RSS are identical across host
       sourceDates: readContent().posts.map(p => [p.data.publishedAt, p.data.updatedAt]),
       latest: sortPosts(posts, 'latest').map(p => p.data.slug),
       oldest: sortPosts(posts, 'oldest').map(p => p.data.slug),
-      updated: sortPosts(posts, 'updated').map(p => p.data.slug),
       html: renderWritingItems(posts, content),
       rss: rssDate('2026-01-01'),
     }));

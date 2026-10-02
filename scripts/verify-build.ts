@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { readContent, publishedPosts, publicSeries } from '../src/lib/content.ts';
-import { listPages, listUrl } from '../src/lib/listing.ts';
+import { listPages, listUrl, retiredSortPages } from '../src/lib/listing.ts';
 import { SITE } from '../src/lib/config.ts';
 import { rssDate, displayDate } from '../src/lib/dates.ts';
 const content = readContent();
@@ -67,6 +67,17 @@ for (const listing of listings) {
   assert.doesNotMatch(page, /data-pagefind-body/);
   if (listing.page > 1) assert.ok(page.includes(`rel="prev" href="${listUrl(listing.base, listing.sort, listing.page - 1)}"`));
   if (listing.page < listing.totalPages) assert.ok(page.includes(`rel="next" href="${listUrl(listing.base, listing.sort, listing.page + 1)}"`));
+}
+for (const base of ['/writing/', ...Object.keys(content.categories).map(id => `/category/${id}/`)]) {
+  const entries = base === '/writing/' ? posts : posts.filter(p => `/category/${p.data.category}/` === base);
+  for (const redirect of retiredSortPages(entries, base)) {
+    const page = html(redirect.source); ++routeCount;
+    assert.ok(page.includes('noindex,follow'));
+    assert.ok(page.includes(`href="${SITE}${redirect.destination}"`));
+    assert.ok(page.includes(`content="0;url=${redirect.destination}"`));
+    assert.ok(!sitemap.includes(`${SITE}${redirect.source}`));
+    assert.doesNotMatch(page, /data-pagefind-body/);
+  }
 }
 for (const series of publicSeries(content)) {
   const page = html(`/series/${series.id}/`); ++routeCount;

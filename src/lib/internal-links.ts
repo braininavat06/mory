@@ -2,7 +2,7 @@ import { existsSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import type { Content } from './content.ts';
 import { publishedPosts, publicSeries } from './content.ts';
-import { listPages, listUrl } from './listing.ts';
+import { listPages, listUrl, retiredSortPages } from './listing.ts';
 import { SITE } from './config.ts';
 
 export interface LinkDocument { file:string; route:string; ids:Set<string>; links:{url:string;line:number}[] }
@@ -19,6 +19,10 @@ export function internalLinkDiagnostics(content:Content, documents:LinkDocument[
   for(const series of publicSeries(content)) routes.set(`/series/${series.id}/`,new Set(['main']));
   for(const doc of targetDocuments) routes.set(doc.route,new Set(['main',...doc.ids]));
   for(const post of posts) for(const alias of post.data.aliases) aliases.set(`/writing/${alias}/`,`/writing/${post.data.slug}/`);
+  for (const base of ['/writing/', ...Object.keys(content.categories).map(id => `/category/${id}/`)]) {
+    const entries = base === '/writing/' ? posts : posts.filter(p => `/category/${p.data.category}/` === base);
+    for (const route of retiredSortPages(entries, base)) aliases.set(route.source, route.destination);
+  }
   const diagnostics:LinkDiagnostic[]=[];
   for(const doc of documents) for(const link of doc.links) {
     let url:URL;

@@ -7,7 +7,7 @@ import { stringify } from 'yaml';
 import { readContent, validateRelations, publicSeries, publishedPosts } from '../src/lib/content.ts';
 import type { Content, Post } from '../src/lib/content.ts';
 import { postSchema } from '../src/lib/schema.ts';
-import { listPages, listUrl } from '../src/lib/listing.ts';
+import { listPages, listUrl, retiredSortPages } from '../src/lib/listing.ts';
 import { assetUrl } from '../src/lib/assets.ts';
 import { fixtureContent } from './fixtures.ts';
 const original = fixtureContent();
@@ -55,8 +55,8 @@ test('43 posts paginate the entire dataset independently for all sorts and categ
   } }));
   for (const base of ['/writing/', '/category/sample/']) {
     const pages = listPages(posts, base);
-    assert.equal(pages.length, 9);
-    for (const sort of ['latest', 'oldest', 'updated'] as const) {
+    assert.equal(pages.length, 6);
+    for (const sort of ['latest', 'oldest'] as const) {
       const group = pages.filter(p => p.sort === sort);
       assert.deepEqual(group.map(p => p.posts.length), [20, 20, 3]);
       assert.equal(new Set(group.flatMap(p => p.posts.map(p => p.data.id))).size, 43);
@@ -119,4 +119,16 @@ test('adjacent writing uses all published posts or the entire category, independ
   assert.deepEqual(adjacentPosts(posts,'missing'),{previous:undefined,next:undefined});
   assert.match(renderWritingItems(publishedPosts(content),content,'sample'),/\?category=sample/);
   assert.doesNotMatch(renderWritingItems(publishedPosts(content),content),/\?category=/);
+});
+
+test('retired modification-order URLs redirect to latest while retaining page numbers', () => {
+  const posts = Array.from({length: 43}, (_, index) => ({ ...original.posts[0], data: { ...original.posts[0].data, id: String(index) } }));
+  for (const base of ['/writing/', '/category/sample/']) {
+    assert.deepEqual(retiredSortPages(posts, base), [
+      {source: `${base}updated/`, destination: base},
+      {source: `${base}updated/page/2/`, destination: `${base}page/2/`},
+      {source: `${base}updated/page/3/`, destination: `${base}page/3/`},
+    ]);
+    assert.deepEqual([...new Set(listPages(posts, base).map(page => page.sort))], ['latest', 'oldest']);
+  }
 });

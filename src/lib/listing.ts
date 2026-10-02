@@ -1,12 +1,12 @@
 import { timestampValue } from './dates.ts';
 import { PAGE_SIZE } from './config.ts';
 import type { Post } from './content.ts';
-export const SORTS = ['latest', 'oldest', 'updated'] as const;
+export const SORTS = ['latest', 'oldest'] as const;
 export type Sort = typeof SORTS[number];
-export const SORT_NAMES: Record<Sort, string> = { latest: '최신순', oldest: '오래된순', updated: '최근 수정순' };
+export const SORT_NAMES: Record<Sort, string> = { latest: '최신순', oldest: '오래된순' };
 export function sortPosts(posts: Post[], sort: Sort): Post[] {
   // Valid YYYY-MM-DD strings sort chronologically without a timezone conversion.
-  const date = (post: Post) => (sort === 'updated' ? post.data.updatedAt ?? post.data.publishedAt : post.data.publishedAt) ?? '';
+  const date = (post: Post) => post.data.publishedAt ?? '';
   return [...posts].sort((a, b) => (sort === 'oldest' ? timestampValue(date(a)) - timestampValue(date(b)) : timestampValue(date(b)) - timestampValue(date(a))) || a.data.id.localeCompare(b.data.id));
 }
 export function adjacentPosts(posts: Post[], id: string, category?: string) {
@@ -25,4 +25,12 @@ export function listPages(posts: Post[], base: string, pageSize = PAGE_SIZE): Li
     return Array.from({ length: totalPages }, (_, i) => ({ posts: sorted.slice(i * pageSize, (i + 1) * pageSize), sort,
       page: i + 1, totalPages, total: posts.length, base }));
   });
+}
+
+// Retired sort URLs retain their page number, but always lead to latest order.
+export function retiredSortPages(posts: Post[], base: string) {
+  return listPages(posts, base).filter(listing => listing.sort === 'latest').map(listing => ({
+    source: `${base}updated/${listing.page === 1 ? '' : `page/${listing.page}/`}`,
+    destination: listUrl(base, 'latest', listing.page),
+  }));
 }

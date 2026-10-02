@@ -2,26 +2,28 @@
 import { getCollection, render } from 'astro:content';
 import { readContent, publishedPosts } from '../../lib/content.ts';
 import type { Post } from '../../lib/content.ts';
-import { listPages, listUrl } from '../../lib/listing.ts';
+import { listPages, listUrl, retiredSortPages } from '../../lib/listing.ts';
 import type { Listing } from '../../lib/listing.ts';
 import ListingLayout from '../../layouts/Listing.astro';
 import PostLayout from '../../layouts/Post.astro';
 import Base from '../../layouts/Base.astro';
+import ListRedirect from '../../components/ListRedirect.astro';
 export function getStaticPaths() {
   const posts = publishedPosts(readContent());
   return [
     ...listPages(posts, '/writing/').map(listing => ({ params: { route: listUrl(listing.base, listing.sort, listing.page).slice('/writing/'.length).replace(/\/$/, '') || undefined }, props: { kind: 'listing', listing } })),
+    ...retiredSortPages(posts, '/writing/').map(route => ({ params: { route: route.source.slice('/writing/'.length).replace(/\/$/, '') }, props: { kind: 'retired', destination: route.destination } })),
     ...posts.map(post => ({ params: { route: post.data.slug }, props: { kind: 'post', post } })),
     ...posts.flatMap(post => post.data.aliases.map(alias => ({ params: { route: alias }, props: { kind: 'alias', post } }))),
   ];
 }
-interface Props { kind: 'listing' | 'post' | 'alias'; listing?: Listing; post?: Post }
+interface Props { kind: 'listing' | 'post' | 'alias' | 'retired'; listing?: Listing; post?: Post; destination?: string }
 const { kind, listing, post } = Astro.props;
 const entry = kind === 'post' ? (await getCollection('posts')).find(entry => entry.data.id === post!.data.id) : undefined;
 if (kind === 'post' && !entry) throw new Error(`${post!.file}: Astro collection entry를 찾지 못했습니다.`);
 const rendered = entry ? await render(entry) : undefined;
 const Content = rendered?.Content;
-const destination = post ? `/writing/${post.data.slug}/` : '';
+const destination = post ? `/writing/${post.data.slug}/` : Astro.props.destination ?? '';
 ---
 {kind === 'listing' && <ListingLayout listing={listing!} />}
 {kind === 'post' && Content && <PostLayout post={post!} headings={rendered!.headings}><Content /></PostLayout>}
@@ -32,3 +34,5 @@ const destination = post ? `/writing/${post.data.slug}/` : '';
   </script>
   <section class="page-content prose"><h1>글 주소가 변경되었습니다</h1><p><a href={destination}>{post!.data.title} — 현재 글로 이동</a></p></section>
 </Base>}
+
+{kind === 'retired' && <ListRedirect destination={destination} />}
