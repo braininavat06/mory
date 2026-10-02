@@ -372,3 +372,38 @@ test('invalid and reserved explicit addresses fail before publishing with readab
     assert.equal(f.store.jobs().length,0);assert.equal(f.store.get(draft.key).value.data.slug,'   ');
   }finally{f.cleanup();}
 });
+
+
+test('diagnostics inspect ordinary links, private destinations and anchors against public snapshots without changing drafts', async () => {
+  const f = setup();
+  try {
+    const target = f.store.list().find(d => d.kind === 'post' && d.value.data.slug === 'a-place-to-write')!;
+    f.store.save(target.key, target.revision, { data: { ...target.value.data, slug: 'pending-new-slug' }, body: '## Pending heading' }, true);
+    const home = f.store.list().find(d => d.kind === 'page' && d.id === 'home')!;
+    const saved = modify(f.store, home, {}, '## Local heading\n\n[own](#local-heading)\n\n[missing](/no-such-page/)\n\n[anchor](/writing/a-place-to-write/#nonexistent-heading)\n\n[public heading](/writing/a-place-to-write/#markdown-검증)\n\n[alias](/writing/first-note/#markdown-검증)\n\n[[a-place-to-write]]\n\n`[code](/ignored-route/)`');
+    const revision = saved.revision;
+    const result = (await linkIssues(f.store)).find(d => d.key === home.key)!;
+    const issues = result.sources.find(s => s.source === '작업본')!.issues!;
+    assert.ok(issues.some(i => i.kind === 'route' && i.target === '/no-such-page/' && i.line > 0));
+    assert.ok(issues.some(i => i.kind === 'anchor' && i.target?.includes('nonexistent-heading')));
+    assert.ok(!issues.some(i => i.kind === 'wikilink'));
+    assert.ok(!issues.some(i => i.target?.includes('markdown-검증')));
+    assert.ok(!issues.some(i => i.target === '#local-heading' || i.target === '/ignored-route/'));
+    assert.equal(f.store.get(home.key).revision, revision);
+    assert.equal(f.store.get(target.key).value.data.slug, 'pending-new-slug');
+    const draft = modify(f.store, f.store.create('post'), { title: 'Private', slug: 'private-post' }, '## Heading\n\n[self](#heading)');
+    modify(f.store, f.store.get(home.key), {}, '[private](/writing/private-post/)');
+    const scan = await linkIssues(f.store);
+    assert.ok(scan.find(d => d.key === home.key)!.sources[0].issues!.some(i => i.kind === 'private-link'));
+    assert.ok(!scan.some(d => d.key === draft.key));
+  } finally { f.cleanup(); }
+});
+test('diagnostics expose Markdown failures instead of silently reporting no problems', async () => {
+  const f = setup();
+  try {
+    const home = f.store.list().find(d => d.kind === 'page' && d.id === 'home')!;
+    modify(f.store, home, {}, '::caption[image missing]');
+    const result = (await linkIssues(f.store)).find(d => d.key === home.key)!;
+    assert.ok(result.sources[0].issues!.some(i => i.kind === 'markdown' && i.severity === 'error'));
+  } finally { f.cleanup(); }
+});

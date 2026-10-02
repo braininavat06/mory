@@ -24,7 +24,7 @@ function youtubeId(raw: string): string | undefined {
   } catch { return; }
 }
 export interface BrokenWikilink { target: string; label: string; line: number }
-export function remarkObsidian(this: any, options: { content?: Content; onBrokenWikilink?: (link: BrokenWikilink) => void; onEmbed?: (filename: string) => void; onAssetUrl?: (url: string) => void; onAssetHtml?: (html: string) => void; assetResolver?: (filename: string, owner?: AssetOwner) => string } = {}) {
+export function remarkObsidian(this: any, options: { content?: Content; wikilinkContent?:Content; onBrokenWikilink?: (link: BrokenWikilink) => void; onEmbed?: (filename: string) => void; onAssetUrl?: (url: string) => void; onAssetHtml?: (html: string) => void; assetResolver?: (filename: string, owner?: AssetOwner) => string } = {}) {
   const parseInline = (source: string) => { const first = (this.parse(source) as Root).children[0]; return first?.type === 'paragraph' ? first.children : [{type:'text' as const,value:source}]; };
   return (tree: Root, file: VFile) => {
     const content = options.content ?? readContent();
@@ -132,7 +132,7 @@ export function remarkObsidian(this: any, options: { content?: Content; onBroken
               ? `<video controls preload="metadata"${width} aria-label="${escapeHtml(name)}"><source src="${escapeHtml(url!)}" type="video/${extension}"><a href="${escapeHtml(url!)}">${escapeHtml(name)} 다운로드</a></video>`
               : imageHtml(target,label) });
           } else {
-            const post = content.posts.find(p => p.data.slug === target || p.data.aliases.includes(target));
+            const post = (options.wikilinkContent??content).posts.find(p => p.data.slug === target || p.data.aliases.includes(target));
             if (!post) {
               file.message(`존재하지 않는 wikilink slug: ${target}; 텍스트로 표시합니다.`, text.position, 'mory:wikilink');
               options.onBrokenWikilink?.({ target, label: label || target, line: (text.position?.start.line ?? 1) + text.value.slice(0, match.index).split('\n').length - 1 });

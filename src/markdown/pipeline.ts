@@ -9,7 +9,7 @@ import { remarkDynamicBlocks } from './dynamic-blocks.ts';
 import type { Content } from '../lib/content.ts';
 import type { RehypePlugins } from '@astrojs/markdown-remark';
 function rehypeImages() { return (tree:any) => { visit(tree,'element',(node:any)=>{ if(node.tagName==='img') node.properties={...node.properties,loading:'lazy',decoding:'async'}; }); }; }
-export function createMarkdownOptions(content?: Content, extraRehypePlugins: RehypePlugins = [], onBrokenWikilink?: (link: BrokenWikilink) => void, assets: { onEmbed?: (filename: string) => void; onAssetUrl?: (url: string) => void; onAssetHtml?: (html: string) => void; assetResolver?: (filename: string, owner?: AssetOwner) => string } = {}) {
+export function createMarkdownOptions(content?: Content, extraRehypePlugins: RehypePlugins = [], onBrokenWikilink?: (link: BrokenWikilink) => void, assets: { wikilinkContent?: Content; onEmbed?: (filename: string) => void; onAssetUrl?: (url: string) => void; onAssetHtml?: (html: string) => void; assetResolver?: (filename: string, owner?: AssetOwner) => string } = {}) {
   return {
     processor: unified({
       gfm: true,

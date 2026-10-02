@@ -30,5 +30,7 @@ export function categoryReferences(drafts: Draft[], id: string) {
 
 export interface LinkIssueDocument {
   key: string; title: string; kind: 'post' | 'page'; status: Draft['status'];
-  sources: { source: '작업본' | '공개본'; links: { target: string; label: string; line: number }[] }[];
+  sources: { source: '작업본' | '공개본'; issues?:ContentIssue[]; links: { target: string; label: string; line: number }[] }[];
 }
+
+export interface ContentIssue { kind:'wikilink'|'route'|'anchor'|'private-link'|'duplicate-anchor'|'markdown'; severity:'warning'|'error'; line:number; target?:string; message:string }

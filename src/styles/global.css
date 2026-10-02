@@ -59,7 +59,6 @@ h3 { font-size: 1.2rem; }
 .home-content { margin-top: 92px; }
 .home-content > h1 { max-width: 680px; font-weight: 600; margin-bottom: 28px; }
 .home-content > p:first-of-type { max-width: 580px; color: var(--muted); font-size: 1.12rem; }
-.home-content > h2 { margin-top: 72px; font-size: .9rem; font-weight: 600; letter-spacing: .025em; color: var(--muted); }
 .page-heading { margin-bottom: 36px; }
 .page-heading h1 { margin: 6px 0 16px; }
 .page-heading p { color: var(--muted); }
@@ -201,7 +200,6 @@ html:has(dialog[open]), body:has(dialog[open]) { overflow: hidden; }
   .theme-control select { font-size: .72rem; }
   .page-content, .listing-content, .post-grid { padding-inline: 22px; margin-top: 44px; }
   .home-content { margin-top: 58px; }
-  .home-content > h2 { margin-top: 48px; }
   .site-footer { margin-top: 60px; padding-inline: 22px; flex-wrap: wrap; }
   .prose { font-size: 1rem; line-height: 1.9; }
   .sort-nav { gap: 18px; }

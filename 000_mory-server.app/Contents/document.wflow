@@ -60,7 +60,7 @@
 				<dict>
 					<key>COMMAND_STRING</key>
 					<string>set -euo pipefail
-exec "$HOME/server/mory/automator-launcher.zsh"
+exec /opt/homebrew/bin/python3 "$HOME/server/ops/automator.py" mory
 </string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>

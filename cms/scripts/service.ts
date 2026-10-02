@@ -76,13 +76,12 @@ async function start() {
     const buildLog = openSync(launcherLog, 'a');
     try { execFileSync('npm', ['run', 'cms:build'], { cwd: root, stdio: ['ignore', buildLog, buildLog] }); }
     finally { closeSync(buildLog); }
-    const output = openSync(log, 'a');
-    const child = spawn(process.execPath, ['--import', 'tsx', entry], { cwd: root, env: process.env, detached: true, stdio: ['ignore', output, output] });
-    closeSync(output);
+    const child = spawn('/opt/homebrew/bin/python3', [join(root, '../ops/log_run.py'), '--log', log, '--cwd', root, '--', process.execPath, '--import', 'tsx', entry], { cwd: root, env: process.env, detached: true, stdio: 'ignore' });
     await new Promise<void>((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
     child.unref();
     for (let attempt = 0; attempt < 40; attempt++) {
-      if (running() === child.pid && await healthy()) { console.log(`Started: ${origin} (pid=${child.pid})`); return; }
+      const serverPid = running();
+      if (serverPid && await healthy()) { console.log(`Started: ${origin} (pid=${serverPid})`); return; }
       if (!live(child.pid!)) break;
       await delay(250);
     }
@@ -107,7 +106,17 @@ try {
   switch (process.argv[2] ?? 'start') {
     case 'start': await start(); break;
     case 'stop': await stop(); break;
-    case 'restart': await stop(); await start(); break;
+    case 'restart': {
+      await stop();
+      await assertFreePort();
+      execFileSync('/usr/bin/open', ['-n', join(root, '000_mory-server.app')]);
+      for (let attempt = 0; attempt < 240; attempt++) {
+        if (running() && await healthy()) { console.log('Restarted through Automator and healthy.'); break; }
+        if (attempt === 239) throw new Error(`Automator 시작을 확인하지 못했습니다. 로그: ${launcherLog}`);
+        await delay(250);
+      }
+      break;
+    }
     case 'status': {
       const pid = running();
       if (!pid || !await healthy()) throw new Error('Not running.');

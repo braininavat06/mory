@@ -115,3 +115,16 @@ body:has(.deployment-dialog[open]) { overflow: hidden; }
 .deployment-dialog input { width: 100%; min-width: 0; padding: 10px; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
 .deployment-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 @media (max-width: 600px) { .deployment-dialog { padding: 18px; } .deployment-dialog dl { grid-template-columns: 80px minmax(0,1fr); } .deployment-toggle { max-width: 104px; } }
+
+.issue-filters { display: flex; flex-wrap: wrap; gap: 16px; margin-block: 24px; }
+.issue-filters label { display: grid; gap: 6px; flex: 1 1 150px; min-width: 0; }
+.issue-filters input, .issue-filters select { width: 100%; min-width: 0; }
+.issue-document-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.issue-document-heading h2 { margin: 0; font-size: 1.2rem; min-width: 0; }
+.issue-document-heading button { flex-shrink: 0; }
+.issue-source h3 { font-size: 1rem; margin-block: 20px 8px; }
+.issue-source ul { list-style: none; padding: 0; }
+.issue-source li { padding-block: 12px; border-bottom: 1px solid var(--line); }
+.issue-source li p { margin-block: 4px; }
+.issue-source code { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .issue-filters { gap: 12px; } .issue-filters label:last-child { flex-basis: 100%; } }
