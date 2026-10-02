@@ -1,5 +1,5 @@
 ---
-title: Mory
+title: Mory 메인 페이지
 description: 개인 홈페이지와 글 아카이브
 imageDimensions: {}
 ---
@@ -19,8 +19,6 @@ imageDimensions: {}
 
 ::recent-writing{count=5}
 
----
-
-## 글 종류
+## 카테고리
 
 ::category-list
