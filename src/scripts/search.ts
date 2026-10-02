@@ -28,8 +28,15 @@ class MorySearch extends HTMLElement {
     const input = this.querySelector<HTMLInputElement>('input')!;
     const status = this.querySelector<HTMLElement>('[role="status"]')!;
     const list = this.querySelector<HTMLOListElement>('ol')!;
+    const mobileKeyboard = () => matchMedia('(pointer: coarse), (max-width: 767px)').matches;
+    input.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229 || !mobileKeyboard()) return;
+      event.preventDefault();
+      form.requestSubmit();
+    });
     form.addEventListener('submit', async event => {
       event.preventDefault();
+      if (mobileKeyboard()) input.blur();
       const query = input.value.trim();
       const sequence = ++this.sequence;
       list.replaceChildren();

@@ -68,8 +68,6 @@ h3 { font-size: 1.2rem; }
 .category-nav [aria-current], .sort-nav [aria-current] { font-weight: 700; color: var(--accent); text-decoration: underline; text-decoration-color: var(--accent); }
 .sort-nav { display: flex; gap: 24px; padding: 25px 0 5px; }
 .sort-nav a { color: var(--muted); }
-.inline-search { margin-top: 20px; }
-.inline-search summary { font-size: .9rem; color: var(--muted); width: fit-content; min-height: 44px; align-content: center; }
 .writing-items { list-style: none; margin: 0; padding: 0; }
 .writing-items li { position: relative; padding: 30px 0; border-bottom: 1px solid var(--line); }
 .writing-items h2 { margin: 10px 0 8px; font-size: 1.35rem; }
