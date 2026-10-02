@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 
 const tick = '\u0060';
 function Example({ children }: { children: string }) {
@@ -6,7 +6,34 @@ function Example({ children }: { children: string }) {
 }
 
 export function Tips() {
-  return <article className="cms-tips prose">
+  const article = useRef<HTMLElement>(null);
+  const toc = useRef<HTMLElement>(null);
+  const [headings, setHeadings] = useState<{ id: string; title: string; depth: number }[]>([]);
+  const [expanded, setExpanded] = useState(() => matchMedia('(min-width: 1000px)').matches);
+  useLayoutEffect(() => {
+    setHeadings([...article.current!.querySelectorAll<HTMLHeadingElement>('h2, h3')].map((heading, index) => {
+      heading.id = `tips-heading-${index + 1}`;
+      heading.tabIndex = -1;
+      return { id: heading.id, title: heading.textContent ?? '', depth: Number(heading.tagName.slice(1)) };
+    }));
+  }, []);
+  useLayoutEffect(() => {
+    const root = document.documentElement, previous = root.style.getPropertyValue('--toc-height');
+    const observer = new ResizeObserver(() => root.style.setProperty('--toc-height', `${toc.current!.getBoundingClientRect().height}px`));
+    observer.observe(toc.current!);
+    return () => { observer.disconnect(); if (previous) root.style.setProperty('--toc-height', previous); else root.style.removeProperty('--toc-height'); };
+  }, []);
+  function jump(id: string) {
+    if (matchMedia('(max-width: 999px)').matches) setExpanded(false);
+    // CMS uses the URL hash for screen navigation. Scroll within Tips without
+    // replacing that route, so refresh and browser history keep working.
+    requestAnimationFrame(() => {
+      const heading = article.current?.querySelector<HTMLElement>(`#${id}`);
+      heading?.scrollIntoView({ block: 'start' });
+      heading?.focus({ preventScroll: true });
+    });
+  }
+  return <div className="tips-layout"><article ref={article} className="cms-tips prose">
     <h1>팁</h1>
     <p>글과 페이지에 사용할 수 있는 문법입니다. 예시를 Markdown 편집창에 붙여넣고 미리보기에서 확인하세요.</p>
     <section>
@@ -93,5 +120,14 @@ export function Tips() {
       <h2>지원하지 않는 Obsidian 기능</h2>
       <p>블록 참조, 문단·노트 가져오기, Canvas, 접히는 콜아웃 문법은 지원하지 않습니다. <code>![[…]]</code>는 이미지·동영상 첨부에만 사용하세요.</p>
     </section>
-  </article>;
+  </article>
+    <aside ref={toc} className="toc tips-toc" aria-label="팁 목차">
+      <details open={expanded} onToggle={event => setExpanded(event.currentTarget.open)}>
+        <summary>목차 <span className="toc-expand">펼치기 +</span><span className="toc-collapse">접기 −</span></summary>
+        <nav aria-label="문법 항목"><ol>{headings.map(heading => <li key={heading.id} className={heading.depth === 3 ? 'toc-subheading' : undefined}>
+          <button type="button" onClick={() => jump(heading.id)}>{heading.title}</button>
+        </li>)}</ol></nav>
+      </details>
+    </aside>
+  </div>;
 }

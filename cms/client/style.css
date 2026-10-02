@@ -128,3 +128,14 @@ body:has(.deployment-dialog[open]) { overflow: hidden; }
 .issue-source li p { margin-block: 4px; }
 .issue-source code { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .issue-filters { gap: 12px; } .issue-filters label:last-child { flex-basis: 100%; } }
+
+.tips-layout { display: grid; grid-template-columns: minmax(0, 820px) 220px; gap: 48px; align-items: start; }
+.cms-tips h2, .cms-tips h3 { scroll-margin-top: 28px; }
+.tips-toc nav { max-height: calc(100dvh - 110px); overflow-y: auto; overscroll-behavior: contain; }
+.tips-toc button { display: block; width: 100%; text-align: left; padding: 8px 12px; border: 0; color: var(--muted); font-size: inherit; line-height: 1.5; overflow-wrap: anywhere; }
+.tips-toc .toc-subheading button { padding-left: 24px; }
+@media (max-width: 999px) {
+  .tips-layout { display: block; }
+  .tips-toc nav { max-height: 45dvh; }
+  .tips-toc button { min-height: 44px; }
+}
