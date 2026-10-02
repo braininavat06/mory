@@ -17,7 +17,7 @@ const pageTitle = `${title}${l.sort === 'latest' ? '' : ` · ${SORT_NAMES[l.sort
     <nav class="category-nav" aria-label="분류별 글"><a href="/writing/" aria-current={!categoryId ? 'page' : undefined}>전체</a>{orderedCategories(content).map(([id, c]) => <a href={`/category/${id}/`} aria-current={id === categoryId ? 'page' : undefined}>{c.name}</a>)}</nav>
     <details class="inline-search"><summary>글 검색</summary><Search /></details>
     <nav class="sort-nav" aria-label="글 정렬">{SORTS.map(sort => <a href={listUrl(l.base, sort)} aria-current={l.sort === sort ? 'page' : undefined}>{SORT_NAMES[sort]}</a>)}</nav>
-    <Fragment set:html={renderWritingItems(l.posts, content)} />
+    <Fragment set:html={renderWritingItems(l.posts, content, categoryId)} />
     <Pagination listing={l} />
   </section>
 </Base>

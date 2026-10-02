@@ -152,6 +152,7 @@ mark { background: var(--highlight); color: inherit; padding-inline: .08em; }
 .adjacent-links a { flex: 1 1 220px; text-decoration: none; color: var(--muted); }
 .adjacent-links span { display: block; color: var(--text); font-size: .95rem; margin-top: 6px; }
 .chronological-navigation { padding-top: 24px; border-top: 1px solid var(--line); }
+[data-post-navigation][hidden] { display: none; }
 .dynamic-block { font-size: 1rem; }
 .prose .dynamic-block .registry-list { padding-left: 0; }
 .prose .dynamic-block .writing-items { margin: 0; padding: 0; }

@@ -12,6 +12,7 @@ import { gitOutput } from './git.ts';
 import { DevSync, remoteIdentity } from './dev-sync.ts';
 import { Assets } from './assets.ts';
 import { managedContent } from './content-paths.ts';
+import { postSlugWarning } from '../slug.ts';
 import { CONTENT_CONTRACT_VERSION } from '../../src/lib/content-contract.ts';
 export interface PublisherOptions { remote: string; deploymentIntervalMs?: number; branch?: string; author?: string; email?: string; assets?: Assets; retryDeployment?: (url: string) => Promise<void>; deployment?: (sha: string) => Promise<{ state: 'deploying' | 'complete' | 'superseded' | 'failed'; url?: string; error?: string }> }
 export class Publisher {
@@ -39,6 +40,10 @@ export class Publisher {
     }
     const row = this.store.get(key);
     if (row.revision !== revision) throw new CmsError(409, '현재 저장된 내용이 바뀌었습니다. 다시 확인한 뒤 게시하세요.');
+    if (row.kind === 'post' && action === 'publish') {
+      const warning = postSlugWarning(row.value.data.slug, row.id, this.store.list());
+      if (warning) throw new CmsError(400, warning);
+    }
     if (this.store.jobs().some(j => j.key === key && j.state === 'publishing')) throw new CmsError(423, '이 문서를 게시하는 중입니다.');
     if (row.kind === 'page' && action !== 'publish') throw new CmsError(400, '일반 페이지는 보관하거나 삭제할 수 없습니다.');
     if (action === 'delete' && row.kind === 'post' && row.value.data.status !== 'archived') throw new CmsError(400, '보관된 글만 영구 삭제할 수 있습니다.');

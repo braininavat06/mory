@@ -9,7 +9,6 @@ import { routeId, ulid as idSchema } from '../../src/lib/schema.ts';
 import { CmsError, categoryReferences } from '../shared.ts';
 import type { Draft, Kind, Payload, PublishJob, LocalSync } from '../shared.ts';
 import { assertRuntimeLocation } from './config.ts';
-import { generatePostSlug } from '../slug.ts';
 
 export function workspaceTime() { const now = new Date(); return publicationTime(now).replace('+09:00', `.${String(now.getUTCMilliseconds()).padStart(3, '0')}+09:00`); }
 export const hash = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -91,8 +90,6 @@ export class Store {
       if (row.kind === 'post') {
         if (value.data.id !== row.id) throw new CmsError(400, '글 ID는 변경할 수 없습니다.');
         idSchema.parse(value.data.id);
-        if (!row.ever_published && !row.value.data.slug && !value.data.slug)
-          value.data.slug = generatePostSlug(String(value.data.title ?? ''), row.id);
         if (value.data.status !== row.value.data.status) throw new CmsError(400, '공개 상태는 게시·보관·복원 버튼으로 변경하세요.');
         if (value.data.category && !Object.hasOwn(this.get('categories:registry').published?.data ?? {}, value.data.category)) throw new CmsError(400, '게시된 분류만 선택할 수 있습니다.');
         if (row.ever_published && value.data.slug !== row.value.data.slug) {

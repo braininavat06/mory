@@ -47,15 +47,19 @@ const listings = [
 for (const listing of listings) {
   const route = listUrl(listing.base, listing.sort, listing.page);
   const page = html(route); ++routeCount;
-  const slugs = [...page.matchAll(/<h2><a href="\/writing\/([^/]+)\/">/g)].map(match => match[1]);
+  const slugs = [...page.matchAll(/<h2><a href="\/writing\/([^/]+)\/(?:\?category=[a-z0-9-]+)?">/g)].map(match => match[1]);
   assert.deepEqual(slugs, listing.posts.map(post => post.data.slug), route);
+  if (listing.base.startsWith('/category/')) {
+    const category = listing.base.split('/')[2];
+    for (const post of listing.posts) assert.ok(page.includes(`href="/writing/${post.data.slug}/?category=${category}"`), route);
+  }
   assert.doesNotMatch(page, /data-pagefind-body/);
   if (listing.page > 1) assert.ok(page.includes(`rel="prev" href="${listUrl(listing.base, listing.sort, listing.page - 1)}"`));
   if (listing.page < listing.totalPages) assert.ok(page.includes(`rel="next" href="${listUrl(listing.base, listing.sort, listing.page + 1)}"`));
 }
 for (const series of publicSeries(content)) {
   const page = html(`/series/${series.id}/`); ++routeCount;
-  assert.deepEqual([...page.matchAll(/<h2><a href="\/writing\/([^/]+)\/">/g)].map(m => m[1]), series.posts.map(p => p.data.slug));
+  assert.deepEqual([...page.matchAll(/<h2><a href="\/writing\/([^/]+)\/(?:\?category=[a-z0-9-]+)?">/g)].map(m => m[1]), series.posts.map(p => p.data.slug));
 }
 assert.ok(existsSync('dist/pagefind/pagefind.js'));
 const index = JSON.parse(readFileSync('dist/pagefind/pagefind-entry.json', 'utf8')) as { languages: Record<string, { page_count: number }> };

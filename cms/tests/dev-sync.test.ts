@@ -186,7 +186,7 @@ test('successful content push survives a concurrent local commit; pending persis
   assert.equal((await f.publisher.deployment(job.id)).state,'complete');assert.equal(f.store.localSync()?.pending,true);
   assert.equal(git(f.remote,['rev-parse','main']),job.commit_sha);assert.equal(f.store.get(f.post.key).ever_published,true);
   const observer=new Store(f.root,f.runtime);assert.equal(observer.localSync()?.publication_sha,job.commit_sha);observer.close();
-  const next=f.store.create('post');f.publisher.request(next.key,next.revision);await f.publisher.idle();
+  const created=f.store.create('post');const next=f.store.save(created.key,created.revision,{...created.value,data:{...created.value.data,title:'Next post',slug:'next-post'}});f.publisher.request(next.key,next.revision);await f.publisher.idle();
   assert.match(f.store.jobs()[0].error!,/동기화가 아직 필요/);assert.equal(git(f.remote,['rev-parse','main']),job.commit_sha);
  }finally{f.close();}
 });

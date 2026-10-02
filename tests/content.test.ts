@@ -106,3 +106,17 @@ test('a fresh repository with no posts directory is valid; required Pages still 
   assert.throws(()=>readContent(root),/src\/content\/pages\/home.md: 필수 page가 없습니다/);
  }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+test('adjacent writing uses all published posts or the entire category, independently of pagination', async () => {
+  const {adjacentPosts}=await import('../src/lib/listing.ts');
+  const {renderWritingItems}=await import('../src/lib/html.ts');
+  const content=clone();
+  const make=(id:string,category:string,date:string,status:'published'|'draft'='published'):Post=>({...content.posts[0],data:{...content.posts[0].data,id,slug:id,title:id,category,publishedAt:date,status}});
+  const posts=[make('a','tech','2026-01-01'),make('b','essay','2026-01-02'),make('c','tech','2026-01-03'),make('d','essay','2026-01-04'),make('e','tech','2026-01-05'),make('hidden','tech','2026-01-04','draft')];
+  assert.equal(adjacentPosts(posts,'c').previous?.data.slug,'b');assert.equal(adjacentPosts(posts,'c').next?.data.slug,'d');
+  assert.equal(adjacentPosts(posts,'c','tech').previous?.data.slug,'a');assert.equal(adjacentPosts(posts,'c','tech').next?.data.slug,'e');
+  assert.equal(adjacentPosts(posts,'a','tech').previous,undefined);assert.equal(adjacentPosts(posts,'e','tech').next,undefined);
+  assert.deepEqual(adjacentPosts(posts,'missing'),{previous:undefined,next:undefined});
+  assert.match(renderWritingItems(publishedPosts(content),content,'sample'),/\?category=sample/);
+  assert.doesNotMatch(renderWritingItems(publishedPosts(content),content),/\?category=/);
+});

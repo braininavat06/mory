@@ -9,6 +9,11 @@ export function sortPosts(posts: Post[], sort: Sort): Post[] {
   const date = (post: Post) => (sort === 'updated' ? post.data.updatedAt ?? post.data.publishedAt : post.data.publishedAt) ?? '';
   return [...posts].sort((a, b) => (sort === 'oldest' ? timestampValue(date(a)) - timestampValue(date(b)) : timestampValue(date(b)) - timestampValue(date(a))) || a.data.id.localeCompare(b.data.id));
 }
+export function adjacentPosts(posts: Post[], id: string, category?: string) {
+  const ordered = sortPosts(posts.filter(post => post.data.status === 'published' && (!category || post.data.category === category)), 'oldest');
+  const index = ordered.findIndex(post => post.data.id === id);
+  return { previous: index > 0 ? ordered[index - 1] : undefined, next: index >= 0 ? ordered[index + 1] : undefined };
+}
 export function listUrl(base: string, sort: Sort, page = 1): string {
   return `${base}${sort === 'latest' ? '' : `${sort}/`}${page === 1 ? '' : `page/${page}/`}`;
 }

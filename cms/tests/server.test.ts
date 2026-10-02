@@ -333,47 +333,42 @@ test('after deleting every post, a fresh publish clone can publish category and 
  }finally{f.cleanup();}
 });
 
-test('empty unpublished slugs are generated on autosave; explicit and existing addresses survive title changes', async () => {
-  const f=setup();
-  try {
-    let english=f.store.create('post');assert.equal(english.value.data.slug,'');
-    english=modify(f.store,english,{title:'Hello, AI World!'},'본문');
-    assert.equal(english.value.data.slug,'hello-ai-world');
-    english=modify(f.store,english,{title:'Changed title'});
-    assert.equal(english.value.data.slug,'hello-ai-world');
-    english=modify(f.store,english,{slug:'my-custom-address'});
-    english=modify(f.store,english,{title:'다른 제목'});
-    assert.equal(english.value.data.slug,'my-custom-address');
-    let korean=f.store.create('post');korean=modify(f.store,korean,{title:'새로운 글'},'본문');
-    assert.equal(korean.value.data.slug,`post-${korean.id.slice(-16).toLowerCase()}`);
-    assert.equal((await publish(f,korean)).state,'deploying');
-    const published=f.store.get(korean.key);
+test('new post addresses stay empty through autosave and require explicit input to publish', async () => {
+  const f=setup();try {
+    let draft=f.store.create('post');
+    draft=modify(f.store,draft,{title:'Hello AI'},'본문');assert.equal(draft.value.data.slug,'');
+    draft=modify(f.store,draft,{title:'한글 제목'});assert.equal(draft.value.data.slug,'');
+    const before=git(f.root,['rev-parse','HEAD']);
+    assert.throws(()=>f.publisher.request(draft.key,draft.revision),/주소.*비어 있습니다/);
+    assert.equal(f.store.jobs().length,0);assert.equal(git(f.root,['rev-parse','HEAD']),before);
+    draft=modify(f.store,draft,{slug:'my-first-post'});draft=modify(f.store,draft,{title:'제목 변경'});
+    assert.equal(draft.value.data.slug,'my-first-post');assert.equal((await publish(f,draft)).state,'deploying');
+    const published=f.store.get(draft.key);
     assert.throws(()=>modify(f.store,published,{slug:'new-address'}),/게시된 주소 변경/);
     const changed=f.store.save(published.key,published.revision,{...published.value,data:{...published.value.data,slug:'new-address'}},true);
-    assert.ok(changed.value.data.aliases.includes(korean.value.data.slug));
-    let legacy=f.store.create('post');legacy=modify(f.store,legacy,{title:'Invalid old address',slug:'Old_Invalid'});
-    legacy=modify(f.store,legacy,{title:'Still invalid'});assert.equal(legacy.value.data.slug,'Old_Invalid');
-  } finally {f.cleanup();}
+    assert.ok(changed.value.data.aliases.includes('my-first-post'));
+  }finally{f.cleanup();}
 });
 
-test('automatic slug generation passes the shared schema, including Korean and reserved routes', async () => {
-  const {generatePostSlug}=await import('../slug.ts');
-  const {routeId}=await import('../../src/lib/schema.ts');
-  const id='01K6F4J0M00000000000000001';
-  for(const title of ['Hello, World!', '안녕하세요', '', '---', '💬', 'oldest', 'updated', 'page', 'École de code', 'ＡＩ Coding', '  A / B___C  ']) {
-    const value=generatePostSlug(title,id);assert.equal(routeId.parse(value),value);assert.ok(!['oldest','updated','page'].includes(value));
-  }
-  assert.equal(generatePostSlug('Hello, World!',id),'hello-world');
-  assert.equal(generatePostSlug('안녕하세요',id),`post-${id.slice(-16).toLowerCase()}`);
-});
-
-test('invalid explicit slug publication reports a readable field error and makes no commit', async () => {
+test('duplicate current, unpublished and historical addresses warn without altering drafts', () => {
   const f=setup();try {
-    const draft=modify(f.store,f.store.create('post'),{title:'Bad address',slug:'Bad_Address'},'본문');
-    const before=git(f.root,['rev-parse','HEAD']);
-    const job=await publish(f,draft);assert.equal(job.state,'failed');
-    assert.match(job.error!,/글 주소 \(slug\): 소문자 영문\/숫자와 하이픈/);
-    assert.ok(!job.error!.includes('"origin"'));assert.ok(!job.error!.includes('"pattern"'));
-    assert.equal(git(f.root,['rev-parse','HEAD']),before);assert.equal(f.store.get(draft.key).value.data.slug,'Bad_Address');
+    let a=modify(f.store,f.store.create('post'),{title:'A',slug:'address-a'});
+    const b=modify(f.store,f.store.create('post'),{title:'B',slug:'address-a'});
+    assert.throws(()=>f.publisher.request(b.key,b.revision),/중복된 글 주소/);
+    assert.equal(f.store.get(b.key).value.data.slug,'address-a');
+    a=modify(f.store,a,{slug:'other-address',aliases:['old-address']});
+    const alias=modify(f.store,b,{slug:'old-address'});assert.throws(()=>f.publisher.request(alias.key,alias.revision),/중복된 글 주소/);
+    const existing=modify(f.store,alias,{slug:'a-place-to-write'});assert.throws(()=>f.publisher.request(existing.key,existing.revision),/중복된 글 주소/);
+    assert.equal(f.store.jobs().length,0);
+  }finally{f.cleanup();}
+});
+
+test('invalid and reserved explicit addresses fail before publishing with readable warnings', () => {
+  const f=setup();try {
+    let draft=modify(f.store,f.store.create('post'),{title:'Bad address',slug:'Bad_Address'},'본문');
+    assert.throws(()=>f.publisher.request(draft.key,draft.revision),/소문자 영문/);
+    draft=modify(f.store,draft,{slug:'oldest'});assert.throws(()=>f.publisher.request(draft.key,draft.revision),/예약 주소/);
+    draft=modify(f.store,draft,{slug:'   '});assert.throws(()=>f.publisher.request(draft.key,draft.revision),/비어 있습니다/);
+    assert.equal(f.store.jobs().length,0);assert.equal(f.store.get(draft.key).value.data.slug,'   ');
   }finally{f.cleanup();}
 });
