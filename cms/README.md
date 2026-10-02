@@ -146,4 +146,33 @@ npm run verify
 npm run cms:build
 ```
 
-Site 및 CMS test는 실제 사이트·임시 bare Git remote·SQLite·가상 timer를 이용합니다. GitHub 배포 API 결과는 mock으로 success/failure/outage를 확인하며 개발 repo/GitHub에 테스트 commit을 만들지 않습니다. 실제 Android/iPad 키보드/IME와 실제 GitHub 게시 credential은 사용자가 최종 확인해야 합니다. 전체 offline 편집, 협업, 자동 merge, 업로드, AI 생성은 이후 범위입니다.
+Site 및 CMS test는 실제 사이트·임시 bare Git remote·SQLite·가상 timer를 이용합니다. GitHub 배포 API 결과는 mock으로 success/failure/outage를 확인하며 개발 repo/GitHub에 테스트 commit을 만들지 않습니다. 실제 Android/iPad 키보드/IME와 실제 GitHub 게시 credential은 사용자가 최종 확인해야 합니다. 전체 offline 편집, 협업, 자동 merge, 동영상/파일 업로드, AI 생성은 이후 범위입니다. 이미지 업로드는 아래 v1 범위로 지원합니다.
+
+## 이미지 업로드 v1
+
+글/Home/About 편집기에서 **이미지**, 이미지 붙여넣기, 끌어놓기를 사용합니다. 다중 선택은 선택 순서대로 삽입되고 업로드 중에도 타이핑할 수 있습니다. 브라우저의 이미지 선택/붙여넣기 지원은 기기에 따라 다릅니다.
+
+- 파일마다 raw binary `POST /api/uploads/<draft-key>` 요청을 보냅니다. `application/octet-stream`과 원본 파일명 메타데이터만 전달하며 서버 경로는 전달하지 않습니다. 업로드는 클라이언트에서 직렬화하고 서버에서도 한 번에 하나로 제한합니다.
+- 기본 최대 40 MiB, 전체 프레임 합계 120,000,000 pixels. JPEG/PNG/WebP/GIF만 허용합니다. 실제 서명·디코딩·픽셀 수를 확인하며 SVG/HEIC/AVIF/동영상은 업로드하지 않습니다.
+- EXIF/GPS/XMP/텍스트 메타데이터를 제거합니다. 일반 파일은 압축된 픽셀을 그대로 보존하고 colour profile/필수 렌더링 정보 및 GIF 애니메이션 타이밍을 유지합니다. EXIF orientation 보정이 필요한 JPEG만 quality 100 / 4:4:4로 재인코딩하며 PNG/WebP는 같은 형식의 lossless 출력입니다. orientation 6/8 등은 표시 방향에 맞춰 폭·높이가 서로 바뀝니다. resize/자동 WebP 변환은 없습니다.
+- 파일은 `runtime/uploads/posts/<post-id>/mory-asset-<asset-ulid>.<ext>` 또는 `runtime/uploads/pages/home|about/...`에 보관합니다. `.temporary/`에서 처리 후 atomic rename하며 바이너리를 SQLite에 넣지 않습니다. staged orphan은 당장 삭제하지 않습니다.
+- SQLite `assets`에는 소유자, generated/original filename, MIME/size/dimensions/SHA256/local relative path/R2 key 및 생성·수정 시각을 저장합니다. `r2_uploaded_at`과 `published_at`은 별도 상태입니다. API에는 실제 경로나 자격증명을 보내지 않습니다.
+- Markdown에는 `![[mory-asset-<ULID>.png|600]]`만 저장합니다. 공개 renderer는 명시적인 managed pattern만 `https://img.mory.place/posts|pages/<owner>/<filename>`로 처리합니다. 기존 파일명과 shared/video embed는 기존 resolver를 사용합니다.
+- preview는 같은 소유자의 local staged file을 `/api/assets/<id>/content`로 제공하고, 공개 파일은 R2 URL로 표시합니다. width 문법은 유지됩니다.
+- 게시 snapshot에서 Markdown parser로 실제 참조한 managed image만 추출합니다. 다른 소유자의 이미지와 unknown staged 참조는 거부합니다. HEAD에서 SHA256/size/MIME을 확인하고, 없으면 조건부 PUT(`If-None-Match: *`) 후 확인합니다. hash가 다른 object는 덮어쓰지 않습니다.
+- PUT 성공 직후 `r2_uploaded_at`을 기록합니다. PUT 직후 중단돼도 HEAD metadata로 복구합니다. R2 성공 후 Git 실패 시 object와 local file은 유지됩니다. Git push 성공 후 publication 상태를 확정하고 local file을 정리합니다. 정리/상태 기록 중단은 게시를 rollback하지 않으며 시작 시 재확인합니다.
+- 보관·복원은 마지막 공개 snapshot을 사용하며 현재 미게시 본문과 staged image를 유지합니다. image reference 제거/보관/영구삭제는 R2 object를 삭제하지 않습니다. 영구삭제된 글의 미업로드 staged file만 정리하며 공개 object는 향후 명시적 cleanup 대상입니다.
+- asset row가 사라졌어도 해당 문서의 마지막 공개 Markdown이 참조하던 파일은 HEAD metadata를 검증해 재등록할 수 있습니다. 다른 문서의 파일이나 아직 게시되지 않은 unknown 파일에는 적용하지 않습니다.
+- SQLite backup과 함께 미게시 바이너리를 `runtime/backups/assets/<sha256>`에 hardlink(불가능하면 copy)하고 `<date>.assets.json`이 참조합니다. 같은 파일은 날짜마다 중복 복사하지 않습니다. 7일 daily/이전 8주 weekly retention에 따라 더 이상 참조하지 않는 backup blob을 정리합니다. SQLite backup 복구 후 시작할 때 누락된 local 파일을 hash 검증한 backup blob에서 복구합니다. 그날 이미 생성된 backup은 다시 쓰지 않으므로 마지막 일일 backup 이후 작업은 다음 backup까지 포함되지 않습니다.
+
+서버 전용 `.env` 변수: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL`. 선택 제한: `MORY_IMAGE_MAX_BYTES`, `MORY_IMAGE_MAX_PIXELS`. 프런트엔드에 `VITE_` 이름으로 넣지 않습니다. R2 설정이 없어도 이미지 없는 작성/자동저장/게시가 동작하며 R2가 필요한 게시에서만 오류가 납니다. 선택한 파일은 게시 전까지 R2에 공개되지 않습니다. R2 공개 호스트 변경 시 `src/lib/assets.ts`의 public base와 서버 설정을 함께 변경합니다.
+
+공개 site/Actions는 runtime, SQLite, R2 credential/HEAD/LIST/API 없이 build합니다. 새 managed renderer는 content contract v4이므로 최초 코드 배포 후 이미지 콘텐츠를 게시합니다. 현재 동작 확인을 위한 임시 Git 저장소/fake S3 테스트는 실제 콘텐츠를 게시하지 않습니다.
+
+명시적인 실제 R2 smoke test(정상 build/tests/startup에서는 실행하지 않음):
+
+```sh
+npx tsx cms/scripts/r2-smoke.ts
+```
+
+`_cms-test/<random-ulid>.png` 하나를 업로드해 HEAD/hash/public GET/MIME/cache header를 확인하고 삭제합니다. 실제 글 object는 건드리지 않습니다. 자격증명/원본 AWS 예외는 출력하지 않습니다. CDN을 별도로 캐싱하도록 설정한 환경에서는 object 삭제와 이미 캐시된 응답의 만료가 다를 수 있습니다.

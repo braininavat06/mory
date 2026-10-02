@@ -14,7 +14,7 @@ export async function linkIssues(store: Store): Promise<LinkIssueDocument[]> {
     const payload = (d: typeof drafts[number]) => source === '작업본' ? d.value : d.published;
     const content: Content = {
       posts: drafts.filter(d => d.kind === 'post' && payload(d)).map(d => ({ file: d.path, data: payload(d)!.data as Content['posts'][number]['data'], body: payload(d)!.body })),
-      pages: [], categories: {}, series: {},
+      pages: drafts.filter(d=>d.kind==='page'&&payload(d)).map(d=>({file:d.path,key:d.id,data:payload(d)!.data as any,body:payload(d)!.body})), categories: {}, series: {},
     };
     content.categories = (source === '작업본' ? drafts.find(d => d.kind === 'categories')?.value.data : drafts.find(d => d.kind === 'categories')?.published?.data) as Content['categories'] ?? {};
     content.series = Object.fromEntries(drafts.filter(d => d.kind === 'series' && payload(d)).map(d => { const { id, ...data } = payload(d)!.data; return [d.id, data]; })) as Content['series'];

@@ -98,3 +98,5 @@ button:disabled, input:disabled { opacity: .55; cursor: default; }
 .link-issue-list > li { padding-block: 24px; border-top: 1px solid var(--line); }
 .link-issue-list > li > button { padding-inline: 0; border: 0; text-align: left; font-weight: 650; }
 .link-issue-list ul { margin-block: 12px 20px; }
+.image-upload-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.image-upload-status { padding-left: 20px; font-size: .85rem; overflow-wrap: anywhere; }

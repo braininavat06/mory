@@ -133,7 +133,7 @@ Markdown에는 파일명만 저장합니다. `src/lib/assets.ts`에서 다음 ob
 MORY_ASSET_BASE=https://img.mory.place
 ```
 
-일반 Pages의 Obsidian asset embed에는 `shared/` 경로를 사용합니다. 파일 참조만 렌더링하며 업로드/삭제/cleanup을 수행하지 않고 archive와 파일 삭제도 연결하지 않습니다. fixture에는 자동 생성 자산만 포함됩니다.
+기존 일반 Pages의 legacy asset embed에는 `shared/` 경로를 사용합니다. CMS 업로드 이미지의 `mory-asset-<ULID>.<ext>`는 Post ULID 또는 Home/About stable ID로 public R2 URL을 계산합니다. 공개 renderer는 DB/R2 API에 접근하지 않습니다. 업로드·미게시 백업·게시 전 R2 처리는 [CMS 설명](cms/README.md#이미지-업로드-v1)을 참고하세요. Archive와 R2 object 삭제는 연결하지 않습니다. fixture에는 자동 생성 자산만 포함됩니다.
 
 ## 정렬 / 페이지네이션
 
@@ -171,7 +171,7 @@ workflow는 main push 또는 수동 실행 시 `npm ci → check → test → bu
 
 ## 의도적으로 제외한 범위
 
-공개 사이트의 DB/backend/API, 인증/account, comments, R2 provisioning/upload/remove/cleanup, analytics, AdSense, newsletter, social feed, AI integration, 공개 사이트 React, MDX, project content type, tags, 고급 Obsidian vault 기능은 구현하지 않았습니다. Post layout에는 향후 모듈을 연결할 slot만 있습니다.
+공개 사이트의 DB/backend/API, 인증/account, comments, R2 provisioning/remove/media library, analytics, AdSense, newsletter, social feed, AI integration, 공개 사이트 React, MDX, project content type, tags, 고급 Obsidian vault 기능은 구현하지 않았습니다. Post layout에는 향후 모듈을 연결할 slot만 있습니다.
 
 ## 개인용 CMS v1
 

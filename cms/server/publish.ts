@@ -10,18 +10,21 @@ import { CmsError } from '../shared.ts';
 import type { Action, Draft, Payload, PublishJob, LocalSync } from '../shared.ts';
 import { gitOutput } from './git.ts';
 import { DevSync, remoteIdentity } from './dev-sync.ts';
+import { Assets } from './assets.ts';
 import { managedContent } from './content-paths.ts';
 import { CONTENT_CONTRACT_VERSION } from '../../src/lib/content-contract.ts';
-export interface PublisherOptions { remote: string; deploymentIntervalMs?: number; branch?: string; author?: string; email?: string; retryDeployment?: (url: string) => Promise<void>; deployment?: (sha: string) => Promise<{ state: 'deploying' | 'complete' | 'superseded' | 'failed'; url?: string; error?: string }> }
+export interface PublisherOptions { remote: string; deploymentIntervalMs?: number; branch?: string; author?: string; email?: string; assets?: Assets; retryDeployment?: (url: string) => Promise<void>; deployment?: (sha: string) => Promise<{ state: 'deploying' | 'complete' | 'superseded' | 'failed'; url?: string; error?: string }> }
 export class Publisher {
   private queue: Promise<void> = Promise.resolve();
   private lastChecked = new Map<string, number>();
   private checking = new Set<string>();
   private retrying = new Map<string, Promise<PublishJob>>();
   private running = new Set<string>();
+  assets: Assets;
   repo: string;
   dev: DevSync;
   constructor(public store: Store, public options: PublisherOptions) {
+    this.assets = options.assets ?? new Assets(store);
     this.repo = join(store.runtime, 'publish-repo');
     this.dev = new DevSync(store, options.remote, options.branch, (sha, cwd) => this.compatible(sha, cwd));
   }
@@ -41,7 +44,7 @@ export class Publisher {
     if (action === 'delete' && row.kind === 'post' && row.value.data.status !== 'archived') throw new CmsError(400, '보관된 글만 영구 삭제할 수 있습니다.');
     if (action !== 'publish' && action !== 'delete' && row.kind !== 'post') throw new CmsError(400, '글에만 사용할 수 있는 동작입니다.');
     if (action === 'restore' && row.value.data.status !== 'archived') throw new CmsError(400, '보관된 글만 복원할 수 있습니다.');
-    const snapshot = structuredClone(row.value);
+    const snapshot = structuredClone(row.kind === 'post' && row.published && ['archive', 'restore'].includes(action) ? row.published : row.value);
     if (row.kind === 'post') {
       if (action === 'delete') snapshot.deleted = true;
       else if (action === 'archive') snapshot.data.status = 'archived';
@@ -50,7 +53,7 @@ export class Publisher {
         if (snapshot.data.status === 'archived') throw new CmsError(400, '보관된 글을 먼저 복원하세요.');
         snapshot.data.status = 'published';
       }
-      if (snapshot.data.status === 'published') {
+      if (action === 'publish' && snapshot.data.status === 'published') {
         if (!snapshot.data.publishedAt) snapshot.data.publishedAt = publicationTime();
         if (row.ever_published && equal(snapshot.data.updatedAt, row.published?.data.updatedAt)) snapshot.data.updatedAt = publicationTime();
       }
@@ -166,6 +169,7 @@ export class Publisher {
         const base = await this.git(['rev-parse', `origin/${branch}`]);
         await this.compatible(base, this.repo);
         this.targetBases(row, job);
+        if (job.action === 'publish' && ['post','page'].includes(row.kind)) await this.assets.prepare(row, job.snapshot, this.repo);
         const touched = [row.path];
         const seriesChanges: { id: string; path: string; payload: Payload }[] = [];
         if (row.kind === 'categories') this.store.assertCategoriesDeletedSafely(row.published?.data ?? {}, job.snapshot.data);
@@ -232,6 +236,7 @@ export class Publisher {
     // Record hashes from this publication, never from a later external edit.
     if (await this.git(['rev-parse', 'HEAD']) !== sha) await this.git(['reset', '--hard', sha]);
     this.recordPush(row, job, sha, seriesChanges);
+    try { await this.assets.published(row, job, this.repo); if(job.action === 'delete') this.assets.deleteStaged(row); } catch { console.warn('CMS image publication bookkeeping deferred'); }
     // recover records failures separately and never throws into publish failure.
     await this.dev.recover();
   }
@@ -243,6 +248,7 @@ export class Publisher {
       } else this.store.db.prepare('UPDATE drafts SET value=?,revision=revision+1,saved_at=?,updated_at=? WHERE key=?').run(JSON.stringify(job.snapshot), workspaceTime(), workspaceTime(), row.key);
       this.store.updateJob(job.id, { state: 'complete' });
     })();
+    if(job.action === 'delete') this.assets.deleteStaged(row);
   }
   recordPush(row: Draft, job: PublishJob, sha: string, seriesChanges: { id: string; path: string; payload: Payload }[] = []) {
     if (row.kind === 'post' && job.action === 'delete' && !seriesChanges.length) {
@@ -255,7 +261,7 @@ export class Publisher {
         if (row.kind === 'post') this.store.removePostReferences(row.id);
       } else {
         const latest = this.store.get(row.key);
-        const value = latest.revision === job.revision ? job.snapshot : latest.value;
+        const value = row.kind === 'post' && ['archive','restore'].includes(job.action) ? { ...latest.value, data: { ...latest.value.data, status: job.snapshot.data.status } } : latest.revision === job.revision ? job.snapshot : latest.value;
         this.store.db.prepare('UPDATE drafts SET value=?,published=?,base_hash=?,ever_published=?,revision=revision+1,saved_at=?,updated_at=? WHERE key=?')
           .run(JSON.stringify(value), JSON.stringify(job.snapshot), fileHash(this.repo, row.path), +(row.ever_published || (row.kind === 'post' ? job.snapshot.data.status === 'published' : true)), workspaceTime(), workspaceTime(), row.key);
       }
@@ -297,7 +303,7 @@ export class Publisher {
     catch { this.store.updateJob(id, { state: 'failed', error: '배포를 다시 시작하지 못했습니다. 서버 연결과 GitHub 권한 설정을 확인하세요.' }); }
     return this.store.job(id);
   }
-  resume() { this.queue = this.queue.then(async () => { await this.dev.recover(); }); for (const job of this.store.jobs().filter(j => j.state === 'publishing')) this.enqueue(job.id); }
+  resume() { this.queue = this.queue.then(async () => { await this.assets.recoverPublications(); await this.dev.recover(); }); for (const job of this.store.jobs().filter(j => j.state === 'publishing')) this.enqueue(job.id); }
 }
 export function githubRetry(token: string | undefined) {
   if (!token) return undefined;

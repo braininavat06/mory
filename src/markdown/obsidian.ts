@@ -3,7 +3,8 @@ import type { Root, Parent, PhrasingContent, Text } from 'mdast';
 import type { VFile } from 'vfile';
 import { readContent } from '../lib/content.ts';
 import type { Content } from '../lib/content.ts';
-import { assetUrl } from '../lib/assets.ts';
+import { resolveAssetUrl } from '../lib/assets.ts';
+import type { AssetOwner } from '../lib/assets.ts';
 import { escapeHtml } from '../lib/html.ts';
 
 const callouts = {
@@ -23,11 +24,13 @@ function youtubeId(raw: string): string | undefined {
   } catch { return; }
 }
 export interface BrokenWikilink { target: string; label: string; line: number }
-export function remarkObsidian(options: { content?: Content; onBrokenWikilink?: (link: BrokenWikilink) => void } = {}) {
+export function remarkObsidian(options: { content?: Content; onBrokenWikilink?: (link: BrokenWikilink) => void; onEmbed?: (filename: string) => void; assetResolver?: (filename: string, owner?: AssetOwner) => string } = {}) {
   return (tree: Root, file: VFile) => {
     const content = options.content ?? readContent();
     const path = (file.path ?? '').replace(/\\/g, '/');
     const current = content.posts.find(p => path.endsWith(p.file));
+    const page = content.pages.find(p => path.endsWith(p.file));
+    const owner: AssetOwner | undefined = current ? { type: 'post', id: current.data.id } : page && ['home', 'about'].includes(page.key) ? { type: 'page', id: page.key } : undefined;
     const source = String(file.value);
     visit(tree, 'paragraph', (node, index, parent) => {
       const raw = node.position ? source.slice(node.position.start.offset, node.position.end.offset).trim() : '';
@@ -66,7 +69,7 @@ export function remarkObsidian(options: { content?: Content; onBrokenWikilink?: 
             if (!['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg', 'mp4', 'webm'].includes(extension ?? '')) file.fail(`지원하지 않는 첨부파일 형식: ${target}`, text.position, 'mory:asset');
             if (label !== undefined && !/^[1-9]\d*$/.test(label)) file.fail(`첨부파일 너비는 양의 정수여야 합니다: ${match[0]}`, text.position, 'mory:asset');
             let url: string;
-            try { url = assetUrl(target, current?.data.id); }
+            try { options.onEmbed?.(target); url = (options.assetResolver ?? resolveAssetUrl)(target, owner); }
             catch (error) { file.fail(error instanceof Error ? error.message : String(error), text.position, 'mory:asset'); }
             const width = label ? ` width="${label}"` : '';
             const name = target.split('/').pop()!;

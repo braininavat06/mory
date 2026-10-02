@@ -221,7 +221,7 @@ test('external conflict reload is explicit, updates base hash, and allows correc
 test('backup keeps seven daily and bounded weekly snapshots; no partial snapshots are accepted',async()=>{
  const f=setup();try{
  for(let i=0;i<=70;i++)await backup(f.store,new Date(Date.UTC(2026,7,1+i,3)));
- const {readdirSync}=await import('node:fs');const files=readdirSync(join(f.store.runtime,'backups'));assert.ok(files.length<=16);assert.ok(files.length>=7);assert.ok(files.every(n=>n.endsWith('.sqlite')));
+ const {readdirSync}=await import('node:fs');const entries=readdirSync(join(f.store.runtime,'backups'));const files=entries.filter(n=>n.endsWith('.sqlite'));assert.ok(files.length<=16);assert.ok(files.length>=7);assert.ok(!entries.some(n=>n.endsWith('.partial')));
  }finally{f.cleanup();}
 });
 

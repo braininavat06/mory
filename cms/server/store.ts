@@ -21,6 +21,7 @@ export const equal = (a: unknown, b: unknown): boolean => {
 };
 export class Store {
   db: Database.Database;
+  backupActive = 0;
   constructor(public root: string, public runtime: string) {
     assertRuntimeLocation(root, runtime);
     mkdirSync(runtime, { recursive: true, mode: 0o700 }); chmodSync(runtime, 0o700);
@@ -34,7 +35,14 @@ export class Store {
       id TEXT PRIMARY KEY, key TEXT NOT NULL, revision INTEGER NOT NULL, action TEXT NOT NULL,
       snapshot TEXT NOT NULL, state TEXT NOT NULL, pushed_at TEXT, commit_sha TEXT, error TEXT, run_url TEXT,
       started_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(key, revision, action));
-      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS assets (
+        id TEXT PRIMARY KEY, owner_type TEXT NOT NULL, owner_id TEXT NOT NULL,
+        filename TEXT NOT NULL UNIQUE, original_filename TEXT NOT NULL, mime_type TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, sha256 TEXT NOT NULL,
+        local_path TEXT, r2_key TEXT NOT NULL UNIQUE, r2_uploaded_at TEXT, published_at TEXT,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS assets_owner ON assets(owner_type,owner_id);`);
     if (!(this.db.pragma('table_info(publish_jobs)') as {name:string}[]).some(c => c.name === 'pushed_at')) this.db.exec('ALTER TABLE publish_jobs ADD COLUMN pushed_at TEXT');
     if (!this.db.prepare("SELECT 1 FROM settings WHERE key = 'imported'").get()) this.import();
   }

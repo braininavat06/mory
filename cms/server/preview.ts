@@ -6,7 +6,9 @@ import sanitizeHtml from 'sanitize-html';
 import { escapeHtml } from '../../src/lib/html.ts';
 import { displayDate } from '../../src/lib/dates.ts';
 import type { Store } from './store.ts';
+import { CmsError } from '../shared.ts';
 import type { Payload } from '../shared.ts';
+import { Assets } from './assets.ts';
 import { rehypePreviewSource } from './preview-source.ts';
 
 export async function renderPreview(store: Store, key: string, value: Payload, theme: string) {
@@ -19,9 +21,13 @@ export async function renderPreview(store: Store, key: string, value: Payload, t
     const index = content.posts.findIndex(p => p.data.id === row.id);
     if (index >= 0) content.posts[index] = post; else content.posts.push(post);
   }
-  const options = createMarkdownOptions(content, [rehypePreviewSource]);
+  const assets = new Assets(store);
+  const published = new Set(row.published?.body.includes('mory-asset-') ? await assets.references(row, row.published) : []);
+  const options = createMarkdownOptions(content, [rehypePreviewSource], undefined, { assetResolver: (filename,owner) => assets.preview(filename,owner,published) });
   const renderer = await options.processor.createRenderer(options);
-  const rendered = await renderer.render(value.body, { fileURL: pathToFileURL(resolve(store.root, row.path)), frontmatter: value.data });
+  let rendered;
+  try { rendered = await renderer.render(value.body, { fileURL: pathToFileURL(resolve(store.root, row.path)), frontmatter: value.data }); }
+  catch(error) { if (String(error).includes('미리보기 이미지 파일이 없습니다.')) throw new CmsError(400, '미리보기 이미지 파일이 없습니다. 이 문서에 이미지를 다시 업로드해 주세요.'); throw error; }
   const safeBody = sanitizeHtml(rendered.code, {
     allowedTags: [...sanitizeHtml.defaults.allowedTags, 'mory-search', 'mark', 'input', 'button', 'form', 'label', 'video', 'source', 'iframe', 'details', 'summary', 'math', 'semantics', 'annotation', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'msubsup', 'mfrac', 'mspace', 'mtext', 'mover', 'munder', 'munderover', 'mtable', 'mtr', 'mtd', 'msqrt', 'mroot', 'mpadded', 'menclose', 'img'],
     allowedAttributes: { '*': ['class', 'id', 'style', 'role', 'aria-*', 'data-*'], a: ['href', 'title'], input: ['type', 'name', 'checked', 'disabled', 'placeholder', 'autocomplete', 'required'], form: ['role'], button: ['type'], img: ['src', 'alt', 'width', 'height', 'loading', 'decoding'], video: ['controls', 'preload', 'width'], source: ['src', 'type'], iframe: ['src', 'title', 'loading', 'allow', 'allowfullscreen', 'referrerpolicy'], math: ['xmlns', 'display'], annotation: ['encoding'] },

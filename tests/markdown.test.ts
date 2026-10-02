@@ -81,3 +81,12 @@ test('build pre-validation makes Markdown errors fatal with the filename', async
   const { validateMarkdown } = await import('../src/lib/validate-markdown.ts');
   await assert.rejects(validateMarkdown(fixture), /src\/content\/posts\/a-place-to-write.md/);
 });
+
+test('managed images resolve from stable post/page owner context without runtime, DB, or R2 calls',async()=>{
+ const filename='mory-asset-01K6F4J0M000000000000000ZZ.png';
+ const postHtml=(await renderer.render(`![[${filename}|600]]`,options)).code;
+ assert.match(postHtml,new RegExp(`https://img.mory.place/posts/${post.data.id}/${filename}`));assert.match(postHtml,/width="600"/);
+ const pageHtml=(await renderer.render(`![[${filename}]]`,pageOptions)).code;
+ assert.match(pageHtml,new RegExp(`https://img.mory.place/pages/home/${filename}`));
+ await assert.rejects(renderer.render('![[mory-asset-not-a-ulid.png]]',options),/이미지 참조/);
+});
