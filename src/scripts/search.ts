@@ -57,11 +57,12 @@ class MorySearch extends HTMLElement {
           const heading = document.createElement('h3');
           const link = document.createElement('a');
           link.href = url.pathname + url.hash;
-          link.textContent = result.meta.title ?? '제목 없는 글';
-          heading.append(link);
+          heading.textContent = result.meta.title ?? '제목 없는 글';
+          link.setAttribute('aria-label', heading.textContent);
           const excerpt = document.createElement('p');
           excerpt.append(excerptFragment(result.excerpt));
-          item.append(heading, excerpt);
+          link.append(heading, excerpt);
+          item.append(link);
           list.append(item);
         }
       } catch {
