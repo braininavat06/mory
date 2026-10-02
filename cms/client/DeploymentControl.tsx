@@ -46,8 +46,8 @@ export function DeploymentControl({ contentVersion }: { contentVersion:string })
   const action=state?.action??'none';
   const actionText={commit:'커밋 및 배포',push:'Push 및 배포',sync:'안전하게 동기화',rerun:'다시 배포',none:''}[action];
   return <><button className="deployment-toggle" aria-haspopup="dialog" onClick={()=>{setConfirmed(undefined);void open();}} title={deploymentLabel(state)}>{deploymentLabel(state)}</button>
-    <dialog ref={dialog} className="deployment-dialog" aria-labelledby="deployment-title" onCancel={e=>{if(submitting)e.preventDefault();}}>
-      <div className="deployment-heading"><h2 id="deployment-title">Mory 배포</h2><button aria-label="배포 창 닫기" disabled={submitting} onClick={()=>dialog.current?.close()}>닫기</button></div>
+    <dialog ref={dialog} className="deployment-dialog" aria-labelledby="deployment-title">
+      <div className="deployment-heading"><h2 id="deployment-title">Mory 배포</h2><button aria-label="배포 창 닫기" onClick={()=>dialog.current?.close()}>닫기</button></div>
       {!state?<p role="status">상태 확인 중…</p>:<>
         <p role="status">{deploymentLabel(state)}</p>
         <dl><dt>로컬 변경</dt><dd>{state.changed}개 · staged {state.staged} / unstaged {state.unstaged} / 새 파일 {state.untracked}</dd>
