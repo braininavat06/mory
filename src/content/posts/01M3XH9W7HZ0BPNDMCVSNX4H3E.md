@@ -3,7 +3,7 @@ id: 01M3XH9W7HZ0BPNDMCVSNX4H3E
 title: 이미지 테스트
 slug: post-z0bpndmcvsnx4h3e
 category: test
-status: published
+status: archived
 description: ""
 aliases: []
 publishedAt: 2026-10-02T14:30:17+09:00
