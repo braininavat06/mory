@@ -21,7 +21,7 @@ const hasTOC = headings.some(h => (h.depth === 2 || h.depth === 3) && h.slug !==
         <a class="eyebrow" href={`/category/${p.category}/`} data-pagefind-ignore>{content.categories[p.category].name}</a>
         <h1 data-pagefind-meta="title">{p.title}</h1>
         <div class="post-meta" data-pagefind-ignore>게시 <time datetime={p.publishedAt!}>{displayDate(p.publishedAt!)}</time>{p.updatedAt && <span>· 수정 <time datetime={p.updatedAt}>{displayDate(p.updatedAt)}</time></span>}</div>
-        <p class="post-description" data-pagefind-meta="description" data-pagefind-ignore>{p.description}</p>
+        <span hidden data-pagefind-meta="description" data-pagefind-ignore>{p.description}</span>
       </header>
       <div class="prose post-body"><slot /></div>
     </article>

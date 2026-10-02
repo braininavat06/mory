@@ -87,11 +87,8 @@ h3 { font-size: 1.2rem; }
 .pagination span { color: var(--muted); }
 .post-grid { display: grid; grid-template-columns: minmax(0, 720px); max-width: 780px; gap: 0 48px; margin: 70px auto 0; padding: 0 30px; }
 .post-grid.with-toc { max-width: 1130px; grid-template-columns: minmax(0, 720px) 220px; }
-.post-heading { margin-bottom: 32px; }
+.post-heading { margin-bottom: 32px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
 .post-heading h1 { margin: 16px 0 20px; font-size: clamp(2rem, 4vw, 2.9rem); }
-.post-description { font-size: 1.06rem; color: var(--muted); padding-top: 22px; border-top: 1px solid var(--line); margin-top: 28px; }
-.post-description { margin-bottom: 0; }
-.post-description:empty { padding-top: 0; }
 .post-body > :first-child { margin-top: 0; }
 .back-to-top { position: fixed; right: max(22px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); z-index: 11; min-height: 44px; padding: 8px 14px; background: var(--surface-raised); border: 1px solid var(--line); color: var(--text); font: inherit; font-size: .8rem; cursor: pointer; }
 .back-to-top[hidden] { display: none; }
@@ -204,7 +201,6 @@ html:has(dialog[open]), body:has(dialog[open]) { overflow: hidden; }
   .sort-nav { gap: 18px; }
   .sort-nav a { font-size: .82rem; }
   .post-heading { margin-bottom: 26px; }
-  .post-description { font-size: .98rem; }
   mory-search input { font-size: 1rem; }
   .toc a { min-height: 44px; align-content: center; }
   .toc li { margin-block: 2px; }
