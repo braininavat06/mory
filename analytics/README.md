@@ -74,7 +74,7 @@ full referrer URL/query, fragment, UTM, 페이지 제목, category/series를 방
   IP는 rate bucket을 HMAC하는 순간에만 사용하고 DB/log/visitor identity에는 넣지 않습니다.
   rate limiting은 edge 위치별 best effort이며 origin도 인증 수단이 아닙니다. 수치는 보안 감사 로그가 아닙니다.
 - public client는 실제 HTTPS mory.place/www에서만 동작. localhost, CMS, preview에서는 식별자도 만들지 않습니다.
-- sendBeacon → queue 거부 시 keepalive fetch, 실패 시 재시도 없음. Back/Forward cache 복원도 PV를 기록합니다.
+- credential-free keepalive fetch (`credentials: omit`), 실패 시 재시도 없음. Cross-origin sendBeacon의 credential 포함 CORS 문제를 피합니다. Back/Forward cache 복원도 PV를 기록합니다.
 - Pagefind 검색을 실제 수행한 뒤 800ms debounce; 같은 visitor/query의 60초 반복 억제.
   click 전 pending 검색을 먼저 보내고 query, 1-based rank, clicked post ULID/path를 보냅니다.
 - 30분 이상 PV 간격은 새 방문. INSERT가 직전 `last_view_at`를 읽고 같은 batch의 trigger가 summary를 갱신합니다.
@@ -179,4 +179,4 @@ Workers Free: 100,000 requests/day, CPU 10ms/request. Free 초과 시 수집을 
 개인 사이트 운영 여유를 위해 약 5,000PV/day 수준을 초기 capacity 검토 기준으로 둘 수 있으나
 이는 고정 limit이 아니며 실제 Cloudflare metrics가 기준입니다. sharding/추가 저장소는 구현하지 않습니다.
 
-최종 public JS 증가량: 동일 bundle/minify 기준 **1,682B**, gzip **754B**. Public React/hydration이나 Analytics SDK를 추가하지 않습니다.
+최종 public JS 증가량: 동일 bundle/minify 기준 **1,608B**, gzip **726B**. Public React/hydration이나 Analytics SDK를 추가하지 않습니다.

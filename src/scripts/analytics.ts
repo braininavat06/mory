@@ -15,8 +15,8 @@ function send(event: Record<string,unknown>) {
  try {
   const data=JSON.stringify({...event,visitor:identity()});
   const url='https://analytics.mory.place/event';
-  const blob=new Blob([data],{type:'application/json'});
-  if(navigator.sendBeacon?.(url,blob))return;
+  // Cross-origin sendBeacon uses credentials=include. Use an explicitly
+  // credential-free keepalive request so collection needs no cookie/CORS grant.
   void fetch(url,{method:'POST',body:data,headers:{'Content-Type':'application/json'},keepalive:true,credentials:'omit'}).catch(()=>{});
  } catch {} // Analytics is never allowed to affect rendering/search/navigation.
 }
@@ -37,7 +37,7 @@ export function searchLogging() {
 }
 if(enabled()) {
  let referrer='';try{referrer=document.referrer?new URL(document.referrer).hostname:'';}catch{}
- send({type:'pageview',...context(),referrer});
+ send({type:'pageview',...context(),...(referrer?{referrer}:{})});
  // Ordinary document navigation loads this module once. A browser Back/Forward
  // Cache restore is another view without a new document/module execution.
  addEventListener('pageshow',event=>{if(event.persisted)send({type:'pageview',...context(),referrer:location.hostname});});

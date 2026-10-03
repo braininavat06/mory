@@ -43,7 +43,9 @@ try {
  for(let i=0;i<3;i++)await maintenance(rollupDB,t+20*86400);
  const finalSize=await size();
  const bytePerPV=(finalSize-baseline)/10000;
- const old=execFileSync('git',['show','HEAD:src/scripts/search.ts'],{encoding:'utf8'});
+ const initial=execFileSync('git',['log','--diff-filter=A','--format=%H','--','src/scripts/analytics.ts'],{encoding:'utf8'}).trim().split('\n').filter(Boolean).at(-1);
+ const baselineRef=initial?`${initial}^`:'HEAD';
+ const old=execFileSync('git',['show',`${baselineRef}:src/scripts/search.ts`],{encoding:'utf8'});
  const baselineJS=(await transform(old,{loader:'ts',minify:true,target:'es2022'})).code;
  const current=(await build({entryPoints:['src/scripts/search.ts'],bundle:true,write:false,minify:true,format:'esm',platform:'browser',target:'es2022'})).outputFiles[0].contents;
  const cost=await mf.getD1Database('COST_DB');await cost.exec(schema.split(/;\s*(?=CREATE|$)/).filter(s=>s.trim()).map(s=>s.trim().replace(/\n/g,' ')+';').join('\n'));
