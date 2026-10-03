@@ -31,6 +31,16 @@ dialog?.addEventListener('click', event => { if (event.target === dialog) dialog
 dialog?.addEventListener('close', () => opener?.focus());
 
 const rssDialog = document.querySelector<HTMLDialogElement>('[data-rss-dialog]');
+const privacyDialog = document.querySelector<HTMLDialogElement>('[data-privacy-dialog]');
+const privacyOpener = document.querySelector<HTMLAnchorElement>('[data-open-privacy]');
+privacyOpener?.addEventListener('click', event => {
+  if (!privacyDialog) return;
+  event.preventDefault();
+  privacyDialog.showModal();
+});
+privacyDialog?.querySelector('[data-close-privacy]')?.addEventListener('click', () => privacyDialog.close());
+privacyDialog?.addEventListener('click', event => { if (event.target === privacyDialog) privacyDialog.close(); });
+privacyDialog?.addEventListener('close', () => privacyOpener?.focus());
 const rssOpener = document.querySelector<HTMLAnchorElement>('[data-open-rss]');
 const rssAddress = rssDialog?.querySelector<HTMLInputElement>('#rss-address');
 const rssStatus = rssDialog?.querySelector<HTMLElement>('[data-rss-copy-status]');

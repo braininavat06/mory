@@ -1,6 +1,7 @@
 ---
 import Search from '../components/Search.astro';
 import BackToTop from '../components/BackToTop.astro';
+import PrivacyNotice from '../components/PrivacyNotice.astro';
 import { SITE, SITE_NAME, SITE_DESCRIPTION } from '../lib/config.ts';
 import '../styles/global.css';
 interface Props { title?: string; description?: string; canonical?: string; noindex?: boolean; redirect?: string; type?: 'website' | 'article'; publishedAt?: string; updatedAt?: string; analyticsContent?: string }
@@ -53,7 +54,17 @@ const analyticsRoute = Astro.props.analyticsContent?'post':canonical==='/404.htm
     <label class="theme-control"><span class="visually-hidden">테마</span><select name="theme" aria-label="테마 선택" data-theme-select><option value="system">시스템</option><option value="light">밝게</option><option value="dark">어둡게</option></select></label>
   </header>
   <main id="main" tabindex="-1"><slot /></main>
-  <footer class="site-footer" data-pagefind-ignore><span>Mory — 개인 홈페이지와 글 아카이브</span><a href="/privacy/">방문 통계 안내</a><a href="/rss.xml" data-open-rss aria-haspopup="dialog">RSS 구독</a></footer>
+  <footer class="site-footer" data-pagefind-ignore>
+    <div class="footer-identity"><a href="/" aria-label="Mory 홈">Mory.</a><span>개인 홈페이지와 글 아카이브</span></div>
+    <nav class="footer-links" aria-label="사이트 안내">
+      <a href="/privacy/" data-open-privacy aria-haspopup="dialog">방문 통계 안내</a>
+      <a href="/rss.xml" data-open-rss aria-haspopup="dialog">RSS 구독</a>
+    </nav>
+  </footer>
+  <dialog class="privacy-dialog" aria-labelledby="privacy-dialog-title" data-privacy-dialog data-pagefind-ignore>
+    <div class="dialog-header"><h2 id="privacy-dialog-title">방문 통계 안내</h2><button type="button" data-close-privacy aria-label="방문 통계 안내 닫기">닫기 ×</button></div>
+    <PrivacyNotice />
+  </dialog>
   <dialog class="rss-dialog" aria-labelledby="rss-dialog-title" data-rss-dialog data-pagefind-ignore>
     <div class="dialog-header"><h2 id="rss-dialog-title">RSS 구독</h2><button type="button" data-close-rss aria-label="RSS 안내 닫기">닫기 ×</button></div>
     <p>RSS 리더 앱에 이 주소를 등록하면 Mory의 새 글을 모아 볼 수 있습니다.</p>

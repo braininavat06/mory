@@ -1,9 +1,10 @@
 ---
 import Base from '../layouts/Base.astro';
+import PrivacyNotice from '../components/PrivacyNotice.astro';
 ---
 <Base title="방문 통계 안내" description="Mory의 방문 통계 수집을 안내합니다.">
  <article class="page-content prose">
   <h1>방문 통계 안내</h1>
-  <p>사이트 이용 현황을 살펴보기 위해 방문 기록을 수집합니다. 통계를 위한 수집으로, 식별 가능한 개인정보는 수집하지 않습니다.</p>
+  <PrivacyNotice />
  </article>
 </Base>
