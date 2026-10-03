@@ -1,3 +1,6 @@
 thought:
   name: 생각
+  order: 20
+med:
+  name: 의학
   order: 10
