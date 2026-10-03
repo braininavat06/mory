@@ -3,12 +3,14 @@ import Search from '../components/Search.astro';
 import BackToTop from '../components/BackToTop.astro';
 import { SITE, SITE_NAME, SITE_DESCRIPTION } from '../lib/config.ts';
 import '../styles/global.css';
-interface Props { title?: string; description?: string; canonical?: string; noindex?: boolean; redirect?: string; type?: 'website' | 'article'; publishedAt?: string; updatedAt?: string }
+interface Props { title?: string; description?: string; canonical?: string; noindex?: boolean; redirect?: string; type?: 'website' | 'article'; publishedAt?: string; updatedAt?: string; analyticsContent?: string }
 const { title = SITE_NAME, description = SITE_DESCRIPTION, canonical = Astro.url.pathname, noindex = false, redirect, type = 'website', publishedAt, updatedAt } = Astro.props;
 const metaDescription = description.trim() || SITE_DESCRIPTION;
 const documentTitle = title === SITE_NAME ? title : `${title} · ${SITE_NAME}`;
 const canonicalUrl = new URL(canonical, SITE).href;
 const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.pathname);
+const path=Astro.url.pathname;
+const analyticsRoute = Astro.props.analyticsContent?'post':canonical==='/404.html'?'404':path==='/'?'home':path==='/about/'?'about':path==='/privacy/'?'privacy':path.startsWith('/category/')?'category':path.startsWith('/series/')?'series':'other';
 ---
 <!doctype html>
 <html lang="ko">
@@ -39,7 +41,7 @@ const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.path
   <link rel="alternate" type="application/rss+xml" title="Mory 글 구독" href="/rss.xml" />
   <slot name="head" />
 </head>
-<body>
+<body data-analytics={redirect ? 'off' : 'on'} data-analytics-route={analyticsRoute} data-analytics-content={Astro.props.analyticsContent}>
   <a class="skip-link" href="#main">본문으로 이동</a>
   <header class="site-header" data-pagefind-ignore>
     <a class="wordmark" href="/" aria-label="Mory 홈">Mory<span aria-hidden="true">.</span></a>
@@ -51,7 +53,7 @@ const writingActive = /^\/(writing|category|series)(?:\/|$)/.test(Astro.url.path
     <label class="theme-control"><span class="visually-hidden">테마</span><select name="theme" aria-label="테마 선택" data-theme-select><option value="system">시스템</option><option value="light">밝게</option><option value="dark">어둡게</option></select></label>
   </header>
   <main id="main" tabindex="-1"><slot /></main>
-  <footer class="site-footer" data-pagefind-ignore><span>Mory — 개인 홈페이지와 글 아카이브</span><a href="/rss.xml" data-open-rss aria-haspopup="dialog">RSS 구독</a></footer>
+  <footer class="site-footer" data-pagefind-ignore><span>Mory — 개인 홈페이지와 글 아카이브</span><a href="/privacy/">방문 통계 안내</a><a href="/rss.xml" data-open-rss aria-haspopup="dialog">RSS 구독</a></footer>
   <dialog class="rss-dialog" aria-labelledby="rss-dialog-title" data-rss-dialog data-pagefind-ignore>
     <div class="dialog-header"><h2 id="rss-dialog-title">RSS 구독</h2><button type="button" data-close-rss aria-label="RSS 안내 닫기">닫기 ×</button></div>
     <p>RSS 리더 앱에 이 주소를 등록하면 Mory의 새 글을 모아 볼 수 있습니다.</p>

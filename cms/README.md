@@ -80,6 +80,8 @@ SQLite `drafts`: `key`, `kind`, `id`, `path`, `value` JSON, `published` JSON, `b
 
 ## 편집과 저장
 
+방문 통계는 상단 `통계` 메뉴에서 확인합니다. 공개 수집은 별도 Cloudflare Worker/D1이고 CMS는 outbound HTTPS로만 조회합니다. 연결 설정, retention, Google Search Console 및 local 검증은 [Analytics 안내](../analytics/README.md)를 참고하세요. Analytics 장애는 편집·자동저장·게시와 분리됩니다.
+
 Writing은 서버에 저장된 작업본의 제목·본문·설명 검색, 상태·분류 필터, CMS 수정 순 목록입니다. 초안/게시됨/수정 중/보관됨은 텍스트로 표시합니다. + 새 글 즉시 ULID와 SQLite row를 생성합니다.
 
 글 목록의 검색어·상태·분류·스크롤 위치는 탭별 sessionStorage에 보관합니다. 편집 화면에서 돌아오거나 새로고침해도 유지하며, 검색 조건을 바꾸면 목록 맨 위로 이동합니다. 이 저장소는 목록 UI에만 사용하고 작업본 자동저장·복구에는 사용하지 않습니다.

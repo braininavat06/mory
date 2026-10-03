@@ -1,12 +1,12 @@
-export const cmsMenus = ['Writing', 'Categories', 'Series', 'Pages', 'Issues', 'Tips'] as const;
+export const cmsMenus = ['Writing', 'Categories', 'Series', 'Pages', 'Issues', 'Tips', 'Analytics'] as const;
 export type CmsMenu = typeof cmsMenus[number];
 export interface CmsLocation { menu: CmsMenu; draft?: string }
-const paths = { Writing: 'writing', Categories: 'categories', Series: 'series', Pages: 'pages', Issues: 'issues', Tips: 'tips' };
+const paths = { Writing: 'writing', Categories: 'categories', Series: 'series', Pages: 'pages', Issues: 'issues', Tips: 'tips', Analytics: 'analytics' };
 export function readLocation(hash: string): CmsLocation {
   const [path, query = ''] = hash.replace(/^#\/?/, '').split('?');
   const menu = cmsMenus.find(menu => paths[menu] === path) ?? 'Writing';
   const draft = new URLSearchParams(query).get('draft');
-  return { menu, ...(draft && !['Categories', 'Tips'].includes(menu) ? { draft } : {}) };
+  return { menu, ...(draft && !['Categories', 'Tips', 'Analytics'].includes(menu) ? { draft } : {}) };
 }
 export function locationHash(location: CmsLocation) {
   const query = location.draft ? `?${new URLSearchParams({ draft: location.draft })}` : '';

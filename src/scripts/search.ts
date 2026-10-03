@@ -1,5 +1,5 @@
-export {};
-interface PagefindData { url: string; meta: { title?: string; description?: string }; excerpt: string }
+import { searchLogging } from './analytics.ts';
+interface PagefindData { url: string; meta: { title?: string; description?: string; content_id?: string }; excerpt: string }
 interface PagefindAPI { search(query: string): Promise<{ results: { data(): Promise<PagefindData> }[] }> }
 let apiPromise: Promise<PagefindAPI> | undefined;
 function api(): Promise<PagefindAPI> {
@@ -24,6 +24,7 @@ function excerptFragment(html: string): DocumentFragment {
 class MorySearch extends HTMLElement {
   private sequence = 0;
   connectedCallback() {
+    const analytics = searchLogging();
     const form = this.querySelector<HTMLFormElement>('form')!;
     const input = this.querySelector<HTMLInputElement>('input')!;
     const status = this.querySelector<HTMLElement>('[role="status"]')!;
@@ -49,14 +50,16 @@ class MorySearch extends HTMLElement {
         const search = await pagefind.search(query);
         const data = await Promise.all(search.results.map(result => result.data()));
         if (sequence !== this.sequence) return;
+        analytics.searched(query, data.length);
         status.textContent = data.length ? `“${query}” 검색 결과: ${data.length}개의 글` : `“${query}” 검색 결과: 일치하는 글이 없습니다.`;
-        for (const result of data) {
+        for (const [index,result] of data.entries()) {
           const url = new URL(result.url, window.location.origin);
           if (url.origin !== window.location.origin || !url.pathname.startsWith('/writing/')) continue;
           const item = document.createElement('li');
           const heading = document.createElement('h3');
           const link = document.createElement('a');
           link.href = url.pathname + url.hash;
+          link.addEventListener('click', () => analytics.clicked(query,index+1,url.pathname,result.meta.content_id));
           heading.textContent = result.meta.title ?? '제목 없는 글';
           link.setAttribute('aria-label', heading.textContent);
           const excerpt = document.createElement('p');

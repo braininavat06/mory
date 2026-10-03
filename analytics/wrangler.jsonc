@@ -1,0 +1,12 @@
+{
+  "name": "mory-analytics",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "analytics.mory.place", "custom_domain": true }],
+  "d1_databases": [{ "binding": "ANALYTICS_DB", "database_name": "mory-analytics", "database_id": "bc551a27-1b13-4488-adfd-12e7b21f0ea8", "migrations_dir": "migrations" }],
+  "ratelimits": [{ "name": "EVENT_LIMITER", "namespace_id": "4000901", "simple": { "limit": 60, "period": 60 } }],
+  "triggers": { "crons": ["15 * * * *"] },
+  "observability": { "enabled": false }
+}

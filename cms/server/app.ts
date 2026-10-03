@@ -1,4 +1,5 @@
 import { MoryDeployment, githubActions } from './deployment.ts';
+import { AnalyticsService } from './analytics.ts';
 import { lifecycle } from './lifecycle-lock.ts';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -15,7 +16,7 @@ import type { Publisher } from './publish.ts';
 import { linkIssues } from './link-issues.ts';
 import { renderPreview } from './preview.ts';
 const keySchema = z.string().regex(/^(post:[0-7][0-9A-HJKMNP-TV-Z]{25}|page:(home|about)|categories:registry|series:[a-z0-9]+(?:-[a-z0-9]+)*)$/);
-export function createApp(store: Store, publisher: Publisher, origin: string, deployment = new MoryDeployment(publisher, githubActions(publisher.options.remote, process.env.MORY_GITHUB_TOKEN, 'deploy.yml', publisher.options.branch ?? 'main'))) {
+export function createApp(store: Store, publisher: Publisher, origin: string, deployment = new MoryDeployment(publisher, githubActions(publisher.options.remote, process.env.MORY_GITHUB_TOKEN, 'deploy.yml', publisher.options.branch ?? 'main')), analytics = new AnalyticsService()) {
   const app = new Hono();
   const previews = new Map<string, { html: string; at: number }>();
   app.use('*', async (c, next) => {
@@ -42,6 +43,11 @@ export function createApp(store: Store, publisher: Publisher, origin: string, de
     return c.json(await deployment.execute(input));
   });
   app.get('/api/link-issues', async c => c.json(await linkIssues(store)));
+  app.get('/api/analytics/storage',async c=>c.json(await analytics.storage()));
+  app.get('/api/analytics/visitors/:id',async c=>{const id=z.coerce.number().int().positive().parse(c.req.param('id'));return c.json(await analytics.visitor(id,analytics.offset(c.req.query('offset'))));});
+  app.put('/api/analytics/visitors/:id/nickname',async c=>{const id=z.coerce.number().int().positive().parse(c.req.param('id'));const input=z.object({nickname:z.string().max(80)}).strict().parse(await c.req.json());return c.json(await analytics.nickname(id,input.nickname));});
+  app.post('/api/analytics/google/sync',async c=>{await c.req.json();return c.json(await analytics.syncGoogle());});
+  app.get('/api/analytics/:tab',async c=>c.json(await analytics.view(c.req.param('tab'),c.req.query())));
   app.post('/api/uploads/:key', async c => {
     const key=keySchema.parse(c.req.param('key'));
     let name='image';try{name=decodeURIComponent(c.req.header('x-file-name')??'image');}catch{throw new CmsError(400,'파일명을 확인할 수 없습니다.');}

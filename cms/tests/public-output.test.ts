@@ -47,7 +47,7 @@ $$
 test('public outputs use Git published snapshots, canonical aliases and no CMS draft data; zero archive builds',()=>{
  const root=mkdtempSync(join(tmpdir(),'mory-public-polish-'));let store:Store|undefined;
  try {
-  for(const name of ['src','public','scripts','astro.config.ts','tsconfig.json','package.json'])cpSync(join(source,name),join(root,name),{recursive:true});symlinkSync(join(source,'node_modules'),join(root,'node_modules'));writeFixtureContent(root);
+  for(const name of ['src','public','scripts','analytics','astro.config.ts','tsconfig.json','package.json'])cpSync(join(source,name),join(root,name),{recursive:true});symlinkSync(join(source,'node_modules'),join(root,'node_modules'));writeFixtureContent(root);
   const content=readContent(root),first=content.posts.find(p=>p.data.slug==='a-place-to-write')!,second=content.posts.find(p=>p.data.slug==='markdown-notes')!;
   const image='mory-asset-01K6F4J0M00000000000000009.webp';
   first.data.title='PUBLIC TITLE';first.data.description='PUBLIC DESCRIPTION';first.data.imageDimensions={[image]:{width:600,height:400}};first.body='PUBLICBODYTOKEN\n\n'+stressMarkdown.replace('image.webp',image);

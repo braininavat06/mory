@@ -8,3 +8,5 @@ dist/
 
 /runtime/
 /cms/dist/
+.wrangler/
+.dev.vars*

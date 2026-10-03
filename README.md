@@ -168,8 +168,12 @@ workflow는 main push 또는 수동 실행 시 `npm ci → check → test → bu
 
 ## 의도적으로 제외한 범위
 
-공개 사이트의 DB/backend/API, 인증/account, comments, R2 provisioning/remove/media library, analytics, AdSense, newsletter, social feed, AI integration, 공개 사이트 React, MDX, project content type, tags, 고급 Obsidian vault 기능은 구현하지 않았습니다. Post layout에는 향후 모듈을 연결할 slot만 있습니다.
+공개 콘텐츠를 제공하는 DB/backend/API, 인증/account, comments, R2 provisioning/remove/media library, AdSense, newsletter, social feed, AI integration, 공개 사이트 React, MDX, project content type, tags, 고급 Obsidian vault 기능은 구현하지 않았습니다. 방문 통계 수집은 아래의 독립 Worker를 사용합니다. Post layout에는 향후 모듈을 연결할 slot만 있습니다.
 
 ## 개인용 CMS v1
 
 설치·실행·저장/게시 정책·설정·제약은 [cms/README.md](cms/README.md)를 참조하세요. `npm run check`와 `npm test`에는 CMS typecheck와 로컬 저장소 통합 테스트도 포함됩니다. 공개 사이트는 계속 정적 Astro이며 React/SQLite는 CMS에서만 사용합니다.
+
+## 방문 통계
+
+공개 Mory의 익명 방문·내부 검색 통계는 별도 Cloudflare Worker와 기존 D1에서 수집합니다. Mac mini CMS는 localhost/tailnet을 유지하고 outbound HTTPS로만 조회·별칭을 관리합니다. 코드 구현과 로컬 검증만 완료했으며 실제 연결은 운영 설정이 필요합니다. [Analytics 설정 및 데이터 정책](analytics/README.md)을 참고하세요.

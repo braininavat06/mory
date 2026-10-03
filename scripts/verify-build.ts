@@ -11,7 +11,7 @@ const html = (route: string) => readFileSync(join('dist', route, 'index.html'), 
 const rss = readFileSync('dist/rss.xml', 'utf8');
 const sitemap = readFileSync('dist/sitemap-0.xml', 'utf8');
 let routeCount = 0;
-for (const route of ['/', '/about/']) {
+for (const route of ['/', '/about/', '/privacy/']) {
   const page = html(route); ++routeCount;
   assert.match(page, /lang="ko"/);
   assert.ok(page.includes(`rel="canonical" href="${SITE}${route}"`));
@@ -26,6 +26,7 @@ for (const post of posts) {
   const route = `/writing/${post.data.slug}/`;
   const page = html(route); ++routeCount;
   assert.match(page, /data-pagefind-body/);
+  assert.ok(page.includes(`data-analytics-content="${post.data.id}"`));
   assert.ok(page.includes(`rel="canonical" href="${SITE}${route}"`));
   assert.ok(rss.includes(`${SITE}${route}`));
   assert.ok(rss.includes(`<pubDate>${rssDate(post.data.publishedAt!)}</pubDate>`));

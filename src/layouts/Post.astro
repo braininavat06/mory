@@ -14,9 +14,9 @@ const all = adjacentPosts(content.posts, p.id);
 const category = adjacentPosts(content.posts, p.id, p.category);
 const hasTOC = headings.some(h => (h.depth === 2 || h.depth === 3) && h.slug !== 'footnote-label');
 ---
-<Base title={p.title} description={p.description} type="article" publishedAt={p.publishedAt} updatedAt={p.updatedAt}>
+<Base title={p.title} description={p.description} type="article" publishedAt={p.publishedAt} updatedAt={p.updatedAt} analyticsContent={p.id}>
   <div class:list={['post-grid', { 'with-toc': hasTOC }]}>
-    <article class="post-content" lang="ko" data-pagefind-body>
+    <article class="post-content" lang="ko" data-pagefind-body data-pagefind-meta={`content_id:${p.id}`}>
       <header class="post-heading">
         <a class="eyebrow" href={`/category/${p.category}/`} data-pagefind-ignore>{content.categories[p.category].name}</a>
         <h1 data-pagefind-meta="title">{p.title}</h1>

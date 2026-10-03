@@ -11,7 +11,7 @@ export function documentRoute(entry: Content['posts'][number] | Content['pages']
   return 'key' in entry ? entry.key === 'home' ? '/' : `/${entry.key}/` : `/writing/${entry.data.slug}/`;
 }
 export function internalLinkDiagnostics(content:Content, documents:LinkDocument[], root:string, targetDocuments=documents):LinkDiagnostic[] {
-  const routes=new Map<string,Set<string>>([['/',new Set(['main'])],['/about/',new Set(['main'])],['/rss.xml',new Set()],['/404.html',new Set(['main'])]]);
+  const routes=new Map<string,Set<string>>([['/',new Set(['main'])],['/about/',new Set(['main'])],['/privacy/',new Set(['main'])],['/rss.xml',new Set()],['/404.html',new Set(['main'])]]);
   const aliases=new Map<string,string>();
   const privateRoutes=new Set(content.posts.filter(p=>p.data.status!=='published').flatMap(p=>[p.data.slug,...p.data.aliases].map(s=>`/writing/${s}/`)));
   const posts=publishedPosts(content);
