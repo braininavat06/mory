@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { EditorState, EditorSelection } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
 import { history, undo, redo } from '@codemirror/commands';
-import { format, markdownLink, wikiLink, calloutMarkdown, tableMarkdown, dynamicMarkdown, imageContext, imageMarkdown, filterCommands, slashContext, outline, editorTargets, addTarget, removeTarget, type Format, codeMarkdown, calloutContext, canEdit, nextCommandIndex, smartPasteLink, linkContext, updateLink, edit, commandGroups, commandGroup } from '../client/editor-commands.ts';
+import { format, markdownLink, wikiLink, calloutMarkdown, tableMarkdown, dynamicMarkdown, imageContext, imageMarkdown, filterCommands, slashContext, outline, editorTargets, addTarget, removeTarget, type Format, codeMarkdown, calloutContext, canEdit, nextCommandIndex, smartPasteLink, linkContext, updateLink, edit, commandGroups, commandGroup, wrapSelectedInput } from '../client/editor-commands.ts';
 const state=(doc:string,from=0,to=doc.length)=>EditorState.create({doc,selection:EditorSelection.single(from,to),extensions:[markdown(),history(),editorTargets]});
 const apply=(doc:string,id:Format,from=0,to=doc.length)=>state(doc,from,to).update(format(state(doc,from,to),id)).state;
 for(const [command,marker] of [['bold','**'],['italic','*'],['strike','~~'],['highlight','=='],['inline-code','`'],['math','$']] as const) {
@@ -60,3 +60,22 @@ test('wikilink context preserves the supported syntax and skips image embeds',()
  assert.equal(linkContext(state(doc,0,doc.length)),null);
 });
 test('every searchable command belongs to a visible tool group',()=>{for(const command of filterCommands('',true))assert.ok(commandGroups.includes(commandGroup(command)));});
+
+for(const marker of ['*','**','_','~~','==','`','$'])test(`typed ${marker} surrounds selection without deleting it`,()=>{
+ const s=state('앞 선택 뒤',2,4),next=s.update(wrapSelectedInput(s,marker)!).state;
+ assert.equal(next.doc.toString(),`앞 ${marker}선택${marker} 뒤`);assert.equal(next.sliceDoc(next.selection.main.from,next.selection.main.to),'선택');
+});
+test('repeated typed star keeps selection and builds bold, preserving backward selection and undo',()=>{
+ let s=state('선택',2,0);s=s.update(wrapSelectedInput(s,'*')!).state;s=s.update(wrapSelectedInput(s,'*')!).state;assert.equal(s.doc.toString(),'**선택**');assert.equal(s.selection.main.anchor,4);assert.equal(s.selection.main.head,2);
+ const target={get state(){return s;},dispatch(tr:any){s=tr.state;}};assert.equal(undo(target),true);assert.equal(s.doc.toString(),'*선택*');assert.equal(undo(target),true);assert.equal(s.doc.toString(),'선택');
+});
+test('typed surround leaves composition, read-only, plain text, paste text and empty selection alone',()=>{
+ const s=state('선택');assert.equal(wrapSelectedInput(s,'*',true),null);assert.equal(wrapSelectedInput(state('선택',1,1),'*'),null);
+ for(const text of ['한글','-','--','abc','https://example.com','**복사한 글**'])assert.equal(wrapSelectedInput(s,text),null);
+ assert.equal(wrapSelectedInput(EditorState.create({doc:'선택',selection:EditorSelection.range(0,2),extensions:EditorState.readOnly.of(true)}),'*'),null);
+});
+test('typed backtick safely wraps code containing ticks',()=>{const s=state('a`b'),next=s.update(wrapSelectedInput(s,'`')!).state;assert.equal(next.doc.toString(),'``a`b``');assert.equal(next.sliceDoc(next.selection.main.from,next.selection.main.to),'a`b');});
+test('typed surround preserves all nonempty multiple selections',()=>{
+ const s=EditorState.create({doc:'A B',selection:EditorSelection.create([EditorSelection.range(0,1),EditorSelection.range(2,3)]),extensions:EditorState.allowMultipleSelections.of(true)});
+ const next=s.update(wrapSelectedInput(s,'*')!).state;assert.equal(next.doc.toString(),'*A* *B*');assert.deepEqual(next.selection.ranges.map(r=>next.sliceDoc(r.from,r.to)),['A','B']);
+});

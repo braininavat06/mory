@@ -17,6 +17,16 @@ export const editorTargets = StateField.define<Map<string, Range>>({
 export function edit(from: number, to: number, insert: string, start = insert.length, end = start): TransactionSpec {
   return {changes:{from,to,insert}, selection:EditorSelection.single(from+start,from+end), annotations:isolateHistory.of('full'), userEvent:'input.mory', scrollIntoView:true};
 }
+export function wrapSelectedInput(state:EditorState,text:string,composing=false):TransactionSpec|null {
+  if(composing||state.readOnly||state.selection.ranges.some(range=>range.empty)||!/^([*_~=`$])\1{0,2}$/.test(text))return null;
+  const changes=state.changeByRange(range=>{
+    const selected=state.sliceDoc(range.from,range.to);
+    const marker=text[0]==='`'?'`'.repeat(Math.max(text.length,...[...selected.matchAll(/`+/g)].map(m=>m[0].length+1))):text;
+    const pad=text[0]==='`'&&/^`|`$/.test(selected)?' ':'';
+    return {changes:[{from:range.from,insert:marker+pad},{from:range.to,insert:pad+marker}],range:EditorSelection.range(range.anchor+marker.length+pad.length,range.head+marker.length+pad.length)};
+  });
+  return {...changes,annotations:isolateHistory.of('full'),userEvent:'input.type',scrollIntoView:true};
+}
 export function inCode(state: EditorState, pos = state.selection.main.head) {
   let node = syntaxTree(state).resolveInner(pos, -1);
   while (node) { if (/^(FencedCode|CodeBlock|InlineCode)$/.test(node.name)) return true; if (!node.parent) break; node=node.parent; }

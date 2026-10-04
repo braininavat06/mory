@@ -1,10 +1,11 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useCallback } from 'react';
 import { EditorView } from '@codemirror/view';
-import { EditorState, Compartment } from '@codemirror/state';
+import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
 import { imageAnchors, addImageAnchor, removeImageAnchor } from './image-anchors.ts';
 import { EditorAssist } from './EditorAssist.tsx';
-import { editorTargets, edit, smartPasteLink } from './editor-commands.ts';
+import { editorTargets, edit, smartPasteLink, wrapSelectedInput } from './editor-commands.ts';
+import { syncEditorSelection } from './editor-selection.ts';
 import type { Draft } from '../shared.ts';
 import { basicSetup } from 'codemirror';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
@@ -47,10 +48,18 @@ export default forwardRef<CodeEditorHandle, { value: string; onChange: (v: strin
     } });
   } }), []);
   useEffect(() => {
-    const editor = new EditorView({ parent: host.current!, state: EditorState.create({ doc: value, extensions: [assistant.current.of([]), basicSetup, imageAnchors, editorTargets, EditorView.domEventHandlers({
+    const editor = new EditorView({ parent: host.current!, state: EditorState.create({ doc: value, extensions: [assistant.current.of([]), Prec.highest(EditorView.inputHandler.of((editor,_from,_to,text)=>{
+      if(isDisabled.current)return false;
+      const wrapped=wrapSelectedInput(editor.state,text,editor.composing||editor.compositionStarted);
+      if(!wrapped)return false;
+      editor.dispatch(wrapped);return true;
+    })), basicSetup, imageAnchors, editorTargets, EditorView.domEventHandlers({
+      copy(_event,editor) { syncEditorSelection(editor); return false; },
+      cut(_event,editor) { syncEditorSelection(editor); return false; },
       paste(event,editor) {
         const plain=plainPaste.current;plainPaste.current=false;
         if(isDisabled.current)return false;
+        syncEditorSelection(editor);
         const files=[...(event.clipboardData?.items??[])].filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);
         if(files.length){event.preventDefault();void images(files);return true;}
         const link=smartPasteLink(editor,event.clipboardData?.getData('text/plain')??'',plain),selection=editor.state.selection.main;

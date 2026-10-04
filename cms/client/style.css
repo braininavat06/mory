@@ -50,9 +50,12 @@
 .cm-content { font-family: 'Pretendard Variable', ui-monospace, monospace; padding-block: 16px; }
 .cm-line { line-height: 1.85; }
 .cm-gutters { background: var(--surface) !important; color: var(--muted) !important; border-color: var(--line) !important; }
-.cm-activeLine, .cm-activeLineGutter { background: var(--callout) !important; }
+/* CodeMirror draws selection behind the text. Opaque line backgrounds hide it. */
+.cm-activeLine { background: transparent !important; }
+.cm-activeLineGutter { background: var(--callout) !important; }
 .cm-cursor { border-left-color: var(--text) !important; }
-.cm-selectionBackground { background: var(--highlight) !important; }
+.cm-selectionBackground { background: #c7d9ef !important; }
+:root[data-theme='dark'] .cm-selectionBackground { background: #395878 !important; }
 :root[data-theme='dark'] .cm-content { color: var(--text); }
 :root[data-theme='dark'] .cm-content .cm-line span { color: var(--accent); }
 .notice { border-left: 3px solid var(--accent); padding: 16px 20px; background: var(--callout); margin-block: 20px; }
@@ -75,7 +78,7 @@ button:disabled, input:disabled { opacity: .55; cursor: default; }
 @media (max-width: 999px) {
  .cms-header { padding: 16px; gap: 12px; flex-wrap: wrap; }
  .cms-header nav { order: 3; flex-basis: 100%; min-width: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
- .cms-header > select { margin-left: auto; }
+ .cms-header > .theme-control { margin-left: auto; }
  .cms-main { padding-inline: 16px; margin-top: 24px; }
  .cms-header nav button { min-width: 44px; padding-inline: 3px; font-size: .85rem; }
  .cms-list button { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
@@ -204,11 +207,9 @@ body:has(.deployment-dialog[open]) { overflow: hidden; }
 .markdown-toolbar button:hover { background: var(--callout); }
 .markdown-toolbar button:first-child { font-weight: 750; }
 .markdown-toolbar button:nth-child(2) { font-style: italic; }
-.markdown-context { display: flex; align-items: center; gap: 12px; padding: 4px 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
-.markdown-context button { border: 0; padding-inline: 0; font-size: .8rem; }
 .markdown-notice { margin: 0; padding: 8px 12px; color: var(--warning); font-size: .8rem; }
-.markdown-editor-status { order: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 0 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: .75rem; }
-.markdown-editor-status span { margin-right: auto; }
+.markdown-editor-status { order: 3; display: flex; flex-wrap: nowrap; height: 44px; flex-shrink: 0; align-items: center; gap: 4px; padding: 0 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: .75rem; }
+.markdown-status-context { margin-right: auto; min-width: 0; white-space: nowrap; }
 .markdown-editor-status button { border: 0; padding-inline: 8px; font-size: .75rem; }
 .editor-assist-dialog { width: min(600px, calc(100vw - 32px)); max-height: min(80dvh, var(--assist-max-height, 720px)); padding: 24px; overflow: auto; overscroll-behavior: contain; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
 .editor-assist-dialog::backdrop { background: rgb(0 0 0 / .45); }
@@ -225,7 +226,6 @@ html:has(.editor-assist-dialog[open]) { scrollbar-gutter: stable; }
 .assist-command-grid small { color: var(--muted); font-size: .7rem; }
 .editor-assist-dialog .dialog-header { position: sticky; top: -24px; padding-block: 12px; background: var(--surface); z-index: 1; }
 .editor-assist-dialog .assist-form-actions { position: sticky; bottom: -24px; padding-block: 12px; background: var(--surface); border-top: 1px solid var(--line); }
-.markdown-context { flex-wrap: wrap; }
 .assist-tabs, .assist-presets, .assist-form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 16px; }
 .assist-tabs [aria-pressed='true'], .assist-presets [aria-pressed='true'] { font-weight: 700; border-bottom: 3px solid var(--accent); }
 .assist-two-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
@@ -248,5 +248,4 @@ html:has(.editor-assist-dialog[open]) { scrollbar-gutter: stable; }
  .editor-assist-dialog .dialog-header { top: -20px; }
  .editor-assist-dialog .assist-form-actions { bottom: -20px; }
  .markdown-editor-status { padding-inline: 4px; }
- .markdown-context span { display: none; }
 }

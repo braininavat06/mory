@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, memo } from 'react';
+import { useEffect, useRef, useState, memo, type PointerEvent, type MouseEvent } from 'react';
+import { syncEditorSelection } from './editor-selection.ts';
 import { Compartment, EditorSelection, Prec } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { isolateHistory, undo, redo } from '@codemirror/commands';
@@ -42,8 +43,14 @@ export const EditorAssist = memo(function EditorAssist({ slot, editor, disabled,
    if(!allowed())return;
    const range=target(p);editor!.dispatch(block?blockEdit(editor!.state,range,text,start,end):edit(range.from,range.to,text,start,end));finish();
  }
+ function retainSelection(event:PointerEvent<HTMLElement>|MouseEvent<HTMLElement>) {
+   if(event.button!==0||!(event.target as HTMLElement).closest('button'))return;
+   if(editor&&!panelRef.current&&!composing.current)syncEditorSelection(editor);
+   event.preventDefault();
+ }
  function run(id:string,fromSlash=false) {
    if(!allowed())return;
+   if(!panelRef.current)syncEditorSelection(editor!);
    try {
      if(id==='undo'||id==='redo'){(id==='undo'?undo:redo)(editor!);editor!.focus();return;}
      const currentPanel=panelRef.current;
@@ -140,18 +147,18 @@ export const EditorAssist = memo(function EditorAssist({ slot, editor, disabled,
  }
  const primary=[['bold','굵게','B'],['italic','기울임','I'],['highlight','강조','강조'],['h2','소제목 H2','H2'],['link','링크 · 내부 글','링크'],['image','이미지 업로드','이미지']];
  return <>
-   <div className="markdown-toolbar" role="toolbar" aria-label="Markdown 작성 도구" onMouseDown={e=>{if((e.target as HTMLElement).closest('button'))e.preventDefault();}}>
+   <div className="markdown-toolbar" role="toolbar" aria-label="Markdown 작성 도구" onPointerDown={retainSelection} onMouseDown={retainSelection}>
      {primary.map(([id,label,text])=><button type="button" key={id} disabled={disabled} title={`${label}${id==='bold'?' (Ctrl/Cmd+B)':id==='italic'?' (Ctrl/Cmd+I)':id==='link'?' (Ctrl/Cmd+K)':''}`} aria-label={label} onClick={()=>run(id)}>{text}</button>)}
      <button type="button" disabled={disabled} aria-label="작성 도구 더보기" aria-haspopup="dialog" onClick={()=>run('menu')}>더보기</button>
    </div>
-   {(image||link||callout)&&<div className="markdown-context">{link&&<button type="button" disabled={disabled} onClick={()=>run('link')}>링크 수정</button>}{callout&&<button type="button" disabled={disabled} onClick={()=>run('callout')}>콜아웃 수정</button>}{image&&<><button type="button" disabled={disabled} onClick={()=>run('image-edit')}>이미지 너비·설명 편집</button><span>커서가 있는 이미지</span></>}</div>}
+
    {notice&&<p className="markdown-notice" role="status">{notice}</p>}
-   {slash&&!disabled&&<div className="slash-picker" style={{top:slashTop}} role="listbox" aria-label="슬래시 작성 명령" ref={listRef}>
+   {slash&&!disabled&&<div className="slash-picker" style={{top:slashTop}} role="listbox" aria-label="슬래시 작성 명령" ref={listRef} onPointerDown={retainSelection}>
      {available.map((c,i)=><button type="button" role="option" aria-selected={i===active} data-active={i===active} key={c.id} onMouseDown={e=>e.preventDefault()} onClick={()=>run(c.id,true)}>{c.name}<small>/{c.id}</small></button>)}
      {!available.length&&<p>일치하는 도구가 없습니다.</p>}
      <p className="muted">↑ ↓ 선택 · Enter 실행 · Esc 닫기</p>
    </div>}
-   <div className="markdown-editor-status"><span>{length.toLocaleString('ko-KR')}자 · Markdown 원문</span><button type="button" disabled={disabled} onClick={()=>run('outline')}>목차 이동</button><button type="button" disabled={disabled} aria-label="실행 취소" onClick={()=>run('undo')}>↶</button><button type="button" disabled={disabled} aria-label="다시 실행" onClick={()=>run('redo')}>↷</button></div>
+   <div className="markdown-editor-status" onPointerDown={retainSelection} onMouseDown={retainSelection}><div className="markdown-status-context">{image?<button type="button" disabled={disabled} aria-label="이미지 너비·설명 편집" onClick={()=>run('image-edit')}>이미지 설정</button>:link?<button type="button" disabled={disabled} onClick={()=>run('link')}>링크 수정</button>:callout?<button type="button" disabled={disabled} onClick={()=>run('callout')}>콜아웃 수정</button>:<span>{length.toLocaleString('ko-KR')}자 · Markdown 원문</span>}</div><button type="button" disabled={disabled} onClick={()=>run('outline')}>목차 이동</button><button type="button" disabled={disabled} aria-label="실행 취소" onClick={()=>run('undo')}>↶</button><button type="button" disabled={disabled} aria-label="다시 실행" onClick={()=>run('redo')}>↷</button></div>
    <dialog ref={dialog} className="editor-assist-dialog" aria-labelledby="editor-assist-title" onCancel={e=>{e.preventDefault();finish();}} onClick={e=>{if(e.target===e.currentTarget){const box=e.currentTarget.getBoundingClientRect();if(e.clientX<box.left||e.clientX>box.right||e.clientY<box.top||e.clientY>box.bottom)finish();}}}>
      <div className="dialog-header"><h2 id="editor-assist-title">{panel?.link?'링크 수정':panel?.callout?'콜아웃 수정':titles[panel?.kind??'']??'작성 도구'}</h2><button type="button" aria-label="작성 도구 닫기" onClick={finish}>닫기 ×</button></div>
      {panel?.kind==='menu'&&<><label>도구 검색<input ref={menuInput} value={filter} placeholder="표, 각주, 시리즈…" onChange={e=>setFilter(e.target.value)} /></label>{commandGroups.map(group=>{const choices=currentChoices.filter(c=>commandGroup(c)===group);return choices.length>0&&<section className="assist-command-section" key={group}><h3>{group}</h3><div className="assist-command-grid">{choices.map(c=><button type="button" key={c.id} aria-label={c.name} onClick={()=>run(c.id)}>{c.name}<small>/{c.id}</small></button>)}</div></section>;})}{!currentChoices.length&&<p className="muted">일치하는 도구가 없습니다. 다른 이름으로 검색해 주세요.</p>}</>}
@@ -170,4 +177,3 @@ export const EditorAssist = memo(function EditorAssist({ slot, editor, disabled,
    </dialog>
  </>;
 });
-

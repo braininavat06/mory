@@ -52,7 +52,11 @@ h3 { font-size: 1.2rem; }
 .site-header nav { display: flex; align-items: center; gap: 14px; }
 .site-header nav a, .site-header nav button { text-decoration: none; font-size: .9rem; min-width: 52px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; padding: 8px 12px; }
 .site-header nav [aria-current] { text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--accent); }
-.theme-control select { background: transparent; font-size: .8rem; border: 0; padding-inline: .25rem; max-width: 95px; }
+.theme-control { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; min-width: 60px; height: 48px; font-size: .9rem; }
+.theme-control > span { pointer-events: none; }
+.theme-control::after { content: ''; width: 5px; height: 5px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); margin-top: -3px; pointer-events: none; }
+.theme-control select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; }
+.theme-control:has(select:focus-visible) { outline: 2px solid var(--accent); outline-offset: 4px; }
 .site-footer { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 32px; border-top: 1px solid var(--line); margin-top: 88px; color: var(--muted); font-size: .8rem; }
 .footer-identity { display: flex; flex-direction: column; gap: 4px; }
 .footer-identity a { align-self: flex-start; font-size: 1.15rem; font-weight: 700; letter-spacing: -.05em; color: var(--text); text-decoration: none; }
@@ -203,7 +207,7 @@ html:has(dialog[open]), body:has(dialog[open]) { overflow: hidden; }
   .wordmark { font-size: 1.65rem; }
   .site-header nav { gap: 8px; }
   .site-header nav a, .site-header nav button { font-size: .8rem; min-width: 48px; padding-inline: 8px; }
-  .theme-control select { font-size: .72rem; }
+  .theme-control { font-size: .8rem; }
   .page-content, .listing-content, .post-grid { padding-inline: 22px; margin-top: 44px; }
   .home-content { margin-top: 58px; }
   .site-footer { margin-top: 60px; padding: 26px 22px; flex-direction: column; align-items: flex-start; gap: 16px; }

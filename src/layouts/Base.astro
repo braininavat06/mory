@@ -51,7 +51,7 @@ const analyticsRoute = Astro.props.analyticsContent?'post':canonical==='/404.htm
       <a href="/writing/" aria-current={writingActive ? 'page' : undefined}>글</a>
       <button type="button" data-open-search aria-haspopup="dialog">검색</button>
     </nav>
-    <label class="theme-control"><span class="visually-hidden">테마</span><select name="theme" aria-label="테마 선택" data-theme-select><option value="system">시스템</option><option value="light">밝게</option><option value="dark">어둡게</option></select></label>
+    <label class="theme-control" title="화면 테마 선택"><span aria-hidden="true">테마</span><select name="theme" aria-label="테마 선택" data-theme-select><option value="system">시스템</option><option value="light">밝게</option><option value="dark">어둡게</option></select></label>
   </header>
   <main id="main" tabindex="-1"><slot /></main>
   <footer class="site-footer" data-pagefind-ignore>
