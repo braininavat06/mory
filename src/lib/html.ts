@@ -28,7 +28,7 @@ export function renderDynamic(kind: DynamicKind, content: Content, count = 5, se
     case 'recent-writing': return renderWritingItems(sortPosts(publishedPosts(content), 'latest').slice(0, count), content);
     case 'writing-list': return renderWritingItems(sortPosts(publishedPosts(content), 'latest'), content);
     case 'writing-search': return renderSearch(publishedPosts(content).length > 0);
-    case 'category-list': return `<ul class="registry-list">${orderedCategories(content).map(([id, category]) => `<li><a href="/category/${id}/">${escapeHtml(category.name)}</a></li>`).join('')}</ul>`;
+    case 'category-list': return `<ul class="registry-list category-list">${orderedCategories(content).map(([id, category]) => `<li><a href="/category/${id}/">${escapeHtml(category.name)}</a></li>`).join('')}</ul>`;
     case 'series-list': return `<ul class="registry-list">${publicSeries(content).map(s => `<li><a href="/series/${s.id}/">${escapeHtml(s.name)}</a><span>${s.posts.length}편</span></li>`).join('')}</ul>`;
     case 'series-writing': {
       if (!seriesId || !Object.hasOwn(content.series, seriesId)) throw new Error(`존재하지 않는 시리즈 ID: ${seriesId ?? ''}`);
