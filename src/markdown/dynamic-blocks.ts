@@ -3,16 +3,18 @@ import type { Root } from 'mdast';
 import type { VFile } from 'vfile';
 import { readContent } from '../lib/content.ts';
 import type { Content } from '../lib/content.ts';
+import { dynamicKinds } from './syntax.ts';
 import { renderDynamic } from '../lib/html.ts';
 import type { DynamicKind } from '../lib/html.ts';
 
+const dynamicPattern = new RegExp(`^::(${dynamicKinds.join('|')})(.*)$`);
 // A separate paragraph-only extension; code, links, and surrounding Markdown are untouched.
 export function remarkDynamicBlocks(options: { content?: Content } = {}) {
   return (tree: Root, file: VFile) => {
     visit(tree, 'paragraph', (node, index, parent) => {
       if (node.children.length !== 1 || node.children[0].type !== 'text') return;
       const raw = node.children[0].value.trim();
-      const match = /^::(recent-writing|category-list|series-writing|series-list|writing-search|writing-list)(.*)$/.exec(raw);
+      const match = dynamicPattern.exec(raw);
       if (!match || !parent || typeof index !== 'number') return;
       const kind = match[1] as DynamicKind;
       const suffix = match[2];

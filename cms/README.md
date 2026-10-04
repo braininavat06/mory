@@ -215,3 +215,15 @@ npx tsx cms/scripts/r2-smoke.ts
 Git push는 origin의 SSH 인증을 사용한다. Actions 조회/재실행에는 기존 서버 전용 `MORY_GITHUB_TOKEN`을 사용한다. Fine-grained token은 Mory repository의 **Actions: Read and write**가 필요하며 토큰을 브라우저에 전달하지 않는다. 조회 실패와 배포 실패는 별도로 표시한다. 실행 중 polling은 5초, idle은 60초이며 숨긴 탭에서는 조회를 쉬고 창 포커스/콘텐츠 게시 상태 변경 시 다시 조회한다.
 
 코드 반영은 `npm run cms:build` 후 운영 CMS를 **직접 재시작**해야 한다. 자동 재시작/새 서비스는 없다.
+
+## Markdown 작성 보조
+
+CodeMirror 원문·selection·history를 유지하며 `editor-commands.ts`의 transaction을 툴바·슬래시 메뉴·단축키에서 공통 사용합니다. 자주 쓰는 서식/링크/이미지는 툴바, 나머지는 검색 가능한 ‘더보기’에 있습니다. 빈 줄의 `/` 명령은 코드 블록이나 일반 URL 내부에서는 열리지 않습니다. 글에서는 `series-writing`만, Home/About에서는 기존 여섯 dynamic block을 선택할 수 있습니다.
+
+링크 창의 Mory 글 검색은 제목·slug를 사용합니다. 공개본이 있는 글은 공개 slug를 참조하며, 초안·보관 글은 기존 wikilink renderer 정책에 따라 텍스트로 표시됩니다. 이미지 inspector는 단독 Obsidian 이미지 줄과 바로 이어진 alt/caption만 수정합니다. 기존 이미지 upload anchor와 서버 API/R2 처리는 그대로 유지합니다.
+
+입력창을 연 순간의 범위는 CM StateField에서 변경사항을 따라 mapping합니다. 해당 범위가 외부 변경으로 달라지면 덮어쓰지 않고 다시 선택하도록 안내합니다. 서식·이미지 설명 수정은 각각 한 undo 단위입니다. composition 중에는 작성 명령을 실행하지 않습니다. URL smart paste는 선택이 있을 때만 적용하며 Ctrl/Cmd+Shift+V는 일반 붙여넣기를 유지합니다.
+
+목차는 사용자가 열 때 CodeMirror의 기존 incremental syntax tree를 읽으며 매 입력마다 본문을 재파싱하지 않습니다. 이미지 context/원문 문자 수는 180ms 뒤 갱신합니다. 표는 행·열 삽입까지만 지원하고, 별도 spreadsheet/HTML→Markdown 변환/실시간 lint는 도입하지 않습니다.
+
+기존 Markdown 링크/위키링크와 콜아웃은 cursor context에서 수정하며 새 링크를 중첩하지 않습니다. Markdown 링크의 선택적인 title은 보존하고, 링크 해제는 표시 문장만 남깁니다. 제목/목록 변환 시 커서는 같은 본문 위치에 유지합니다. 도구 메뉴는 종류별로 묶고, 모바일에서 메뉴·너비·표 설정을 열 때 키보드를 자동으로 열지 않습니다. 도구 창은 배경 스크롤을 잠그고 닫기/적용 영역을 유지합니다.

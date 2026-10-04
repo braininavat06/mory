@@ -7,22 +7,7 @@ import { resolveAssetUrl } from '../lib/assets.ts';
 import type { AssetOwner } from '../lib/assets.ts';
 import { escapeHtml } from '../lib/html.ts';
 
-const callouts = {
-  note: { label: '참고', icon: 'ⓘ' },
-  tip: { label: '팁', icon: '✓' },
-  important: { label: '중요', icon: '!' },
-  warning: { label: '주의', icon: '△' },
-};
-function youtubeId(raw: string): string | undefined {
-  try {
-    const url = new URL(raw);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
-    const host = url.hostname.replace(/^www\./, '');
-    const id = host === 'youtu.be' ? url.pathname.slice(1) : ['youtube.com', 'm.youtube.com'].includes(host)
-      ? url.pathname === '/watch' ? url.searchParams.get('v') : /^\/(?:shorts|embed)\/([^/]+)\/?$/.exec(url.pathname)?.[1] : undefined;
-    return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : undefined;
-  } catch { return; }
-}
+import { callouts, youtubeId, imageDirective } from './syntax.ts';
 export interface BrokenWikilink { target: string; label: string; line: number }
 export function remarkObsidian(this: any, options: { content?: Content; wikilinkContent?:Content; onBrokenWikilink?: (link: BrokenWikilink) => void; onEmbed?: (filename: string) => void; onAssetUrl?: (url: string) => void; onAssetHtml?: (html: string) => void; assetResolver?: (filename: string, owner?: AssetOwner) => string } = {}) {
   const parseInline = (source: string) => { const first = (this.parse(source) as Root).children[0]; return first?.type === 'paragraph' ? first.children : [{type:'text' as const,value:source}]; };
@@ -46,11 +31,8 @@ export function remarkObsidian(this: any, options: { content?: Content; wikilink
     }
     function plain(nodes: any[]): string { return nodes.map(n => n.type === 'html' ? '' : n.type === 'image' ? n.alt ?? '' : n.children ? plain(n.children) : n.value ?? '').join(''); }
     function directive(line: string) {
-      const m = /^::(alt|caption)\[/.exec(line); if(!m) return null;
-      let depth=1, escaped=false, end=-1;
-      for(let i=m[0].length;i<line.length;i++) { const c=line[i]; if(escaped){escaped=false;continue;} if(c==='\\'){escaped=true;continue;} if(c==='[')depth++; if(c===']' && --depth===0){end=i;break;} else if(c!==']') { /* balance handled above */ } }
-      if(end<0 || line.slice(end+1).trim()) file.fail('이미지 설명 문법의 대괄호를 확인하세요. ::alt[설명] 또는 ::caption[설명] 형식입니다.', undefined, 'mory:image-metadata');
-      return {kind:m[1],value:line.slice(m[0].length,end)};
+      try { return imageDirective(line); }
+      catch (error) { file.fail((error as Error).message, undefined, 'mory:image-metadata'); }
     }
     visit(tree, 'paragraph', (node, index, parent) => {
       const raw = node.position ? source.slice(node.position.start.offset,node.position.end.offset).trim() : '';
