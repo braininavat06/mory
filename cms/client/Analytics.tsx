@@ -1,6 +1,8 @@
 import { Component, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api } from './api.ts';
+import type { AnalyticsTab } from './navigation.ts';
+type AnalyticsNavigation = { tab: AnalyticsTab; navigate: (tab: AnalyticsTab) => void };
 const time=(value:number|null|undefined)=>value?new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',dateStyle:'medium',timeStyle:'short'}).format(value*1000):'—';
 const number=(value:number|null|undefined)=>value==null?'—':value.toLocaleString('ko-KR');
 function Table({headers,rows}:{headers:string[];rows:any[][]}){return <div className="analytics-table-wrap"><table><thead><tr>{headers.map(h=><th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{rows.length?rows.map((row,i)=><tr key={i}>{row.map((cell,j)=><td key={j}>{cell}</td>)}</tr>):<tr><td colSpan={headers.length}>아직 기록이 없습니다.</td></tr>}</tbody></table></div>;}
@@ -9,12 +11,13 @@ class AnalyticsBoundary extends Component<{children:ReactNode},{failed:boolean}>
  static getDerivedStateFromError(){return{failed:true};}
  render(){return this.state.failed?<section><h1>방문 통계</h1><p role="alert">통계 화면을 표시하지 못했습니다. 글 작성과 게시 기능은 계속 사용할 수 있습니다.</p><button onClick={()=>this.setState({failed:false})}>다시 불러오기</button></section>:this.props.children;}
 }
-export default function AnalyticsPanel(){return <AnalyticsBoundary><Analytics/></AnalyticsBoundary>;}
-function Analytics(){
- const [tab,setTab]=useState('overview'),[period,setPeriod]=useState('30'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[query,setQuery]=useState(''),[offset,setOffset]=useState(0);
+export default function AnalyticsPanel(props: AnalyticsNavigation){return <AnalyticsBoundary><Analytics {...props}/></AnalyticsBoundary>;}
+function Analytics({tab: routeTab,navigate}: AnalyticsNavigation){
+ const [tab,setTab]=useState<AnalyticsTab>(routeTab),[period,setPeriod]=useState('30'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[query,setQuery]=useState(''),[offset,setOffset]=useState(0);
  const [data,setData]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0),[storage,setStorage]=useState<any>(null);
  const [visitor,setVisitor]=useState<any>(null),[nickname,setNickname]=useState(''),[writing,setWriting]=useState(false),[notice,setNotice]=useState('');
  const [syncing,setSyncing]=useState(false);const sequence=useRef(0);
+ useEffect(()=>{if(routeTab===tab)return;sequence.current++;setData(null);setBusy(true);setVisitor(null);setNotice('');setTab(routeTab);setOffset(0);},[routeTab,tab]);
  useEffect(()=>{
   if(period==='custom'&&(!from||!to))return;
   const id=++sequence.current;setBusy(true);setError('');setData(null);
@@ -23,10 +26,10 @@ function Analytics(){
   return()=>{clearTimeout(timer);sequence.current++;};
  },[tab,period,from,to,query,offset,refresh]);
  function open(id:number){const request=++sequence.current;setBusy(true);setError('');void api<any>(`/api/analytics/visitors/${id}`).then(next=>{if(request===sequence.current){setVisitor(next);setNickname(next.visitor.nickname??'');}}).catch(e=>{if(request===sequence.current)setError(e.message);}).finally(()=>{if(request===sequence.current)setBusy(false);});}
- function switchTab(next:string){sequence.current++;setData(null);setBusy(true);setVisitor(null);setNotice('');setTab(next);setOffset(0);}
+ function switchTab(next:AnalyticsTab){navigate(next);}
  const labels={overview:'개요',visitors:'방문자',pages:'페이지',search:'검색'};
  return <section className="analytics" aria-label="방문 통계"><div className="section-heading"><h1>방문 통계</h1><button onClick={()=>setRefresh(x=>x+1)} disabled={busy}>새로고침</button></div>
-  <nav className="analytics-tabs" aria-label="통계 화면">{Object.entries(labels).map(([id,label])=><button key={id} aria-current={tab===id?'page':undefined} onClick={()=>switchTab(id)}>{label}</button>)}</nav>
+  <nav className="analytics-tabs" aria-label="통계 화면">{Object.entries(labels).map(([id,label])=><button key={id} aria-current={tab===id?'page':undefined} onClick={()=>switchTab(id as AnalyticsTab)}>{label}</button>)}</nav>
   {!visitor&&<div className="filters"><label>기간 <select aria-label="통계 기간" value={period} onChange={e=>{setPeriod(e.target.value);setOffset(0);}}><option value="1">오늘</option><option value="7">7일</option><option value="30">30일</option><option value="365">1년</option><option value="all">전체</option><option value="custom">직접 선택</option></select></label>{period==='custom'&&<><label>시작일 <input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>종료일 <input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></>}</div>}
   {error&&<p role="alert">! {error} <button onClick={()=>setRefresh(x=>x+1)}>다시 확인</button></p>}
   {notice&&<p role="status">{notice}</p>}{busy&&<p role="status">통계를 불러오는 중…</p>}

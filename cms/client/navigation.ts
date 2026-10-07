@@ -1,15 +1,21 @@
 export const cmsMenus = ['Writing', 'Categories', 'Series', 'Pages', 'Issues', 'Tips', 'Analytics'] as const;
 export type CmsMenu = typeof cmsMenus[number];
-export interface CmsLocation { menu: CmsMenu; draft?: string }
+export const analyticsTabs = ['overview', 'visitors', 'pages', 'search'] as const;
+export type AnalyticsTab = typeof analyticsTabs[number];
+export interface CmsLocation { menu: CmsMenu; draft?: string; analyticsTab?: AnalyticsTab }
 const paths = { Writing: 'writing', Categories: 'categories', Series: 'series', Pages: 'pages', Issues: 'issues', Tips: 'tips', Analytics: 'analytics' };
 export function readLocation(hash: string): CmsLocation {
   const [path, query = ''] = hash.replace(/^#\/?/, '').split('?');
   const menu = cmsMenus.find(menu => paths[menu] === path) ?? 'Writing';
   const draft = new URLSearchParams(query).get('draft');
-  return { menu, ...(draft && !['Categories', 'Tips', 'Analytics'].includes(menu) ? { draft } : {}) };
+  const tab = new URLSearchParams(query).get('tab');
+  return { menu, ...(draft && !['Categories', 'Tips', 'Analytics'].includes(menu) ? { draft } : {}), ...(menu === 'Analytics' && tab !== 'overview' && analyticsTabs.includes(tab as AnalyticsTab) ? { analyticsTab: tab as AnalyticsTab } : {}) };
 }
 export function locationHash(location: CmsLocation) {
-  const query = location.draft ? `?${new URLSearchParams({ draft: location.draft })}` : '';
+  const params = new URLSearchParams();
+  if (location.draft) params.set('draft', location.draft);
+  if (location.menu === 'Analytics' && location.analyticsTab && location.analyticsTab !== 'overview') params.set('tab', location.analyticsTab);
+  const query = params.size ? `?${params}` : '';
   return `#/${paths[location.menu]}${query}`;
 }
 export interface NavigationHistory {

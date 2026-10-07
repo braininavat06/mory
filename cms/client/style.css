@@ -19,6 +19,10 @@
 .cms-list li { border-bottom: 1px solid var(--line); }
 .cms-list button { width: 100%; border: 0; text-align: left; display: grid; grid-template-columns: minmax(180px, 1fr) 130px 100px 180px; gap: 16px; padding: 22px 0; }
 .cms-list span, .cms-list time, .muted { color: var(--muted); font-size: .85rem; }
+.cms-writing-open { border: 0; padding: 0; min-height: 0; text-align: left; font: inherit; font-weight: inherit; background: transparent; overflow-wrap: anywhere; }
+.cms-writing-open::after { content: ''; position: absolute; inset: 0; }
+.cms-writing-items .post-dates { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.cms-writing-items .post-meta { overflow-wrap: anywhere; }
 .editor-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--line); margin-bottom: 28px; }
 .editor-toolbar p { flex: 1; font-size: .85rem; color: var(--muted); }
 .editor fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }

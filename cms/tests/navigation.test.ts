@@ -61,3 +61,28 @@ test('a slower earlier navigation cannot replace a newer destination', () => {
   controller.navigate({ menu: 'Pages' }); controller.navigate({ menu: 'Tips' });
   actions[1](); actions[0](); assert.deepEqual(shown, ['#/tips']);
 });
+
+test('Analytics tabs round-trip in the URL and invalid tabs fall back to overview', () => {
+  for (const analyticsTab of ['visitors', 'pages', 'search'] as const) {
+    const location = { menu: 'Analytics' as const, analyticsTab };
+    assert.deepEqual(readLocation(locationHash(location)), location);
+  }
+  assert.equal(locationHash({ menu: 'Analytics', analyticsTab: 'overview' }), '#/analytics');
+  assert.deepEqual(readLocation('#/analytics?tab=invalid'), { menu: 'Analytics' });
+  assert.deepEqual(readLocation('#/writing?tab=search'), { menu: 'Writing' });
+});
+test('Analytics tab history supports back, forward, reload and duplicate-click no-op', () => {
+  const f = fixture('#/analytics');
+  f.controller.navigate({ menu: 'Analytics', analyticsTab: 'visitors' }); f.flush();
+  f.controller.navigate({ menu: 'Analytics', analyticsTab: 'pages' }); f.flush();
+  f.controller.navigate({ menu: 'Analytics', analyticsTab: 'pages' }); f.flush();
+  assert.equal(f.entries.length, 3);
+  f.back(); f.flush(); f.eventsFlush();
+  assert.equal(f.current().hash, '#/analytics?tab=visitors');
+  assert.deepEqual(readLocation(fixture(f.current().hash).current().hash), { menu: 'Analytics', analyticsTab: 'visitors' });
+  f.forward(); f.flush(); f.eventsFlush();
+  assert.equal(f.current().hash, '#/analytics?tab=pages');
+  f.back(); f.flush(); f.eventsFlush();
+  f.back(); f.flush(); f.eventsFlush();
+  assert.equal(f.current().hash, '#/analytics');
+});
