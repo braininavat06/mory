@@ -3,6 +3,7 @@ import { AnalyticsService } from './analytics.ts';
 import { lifecycle } from './lifecycle-lock.ts';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
+import { compress } from 'hono/compress';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { readFileSync, existsSync, createReadStream } from 'node:fs';
 import { Readable } from 'node:stream';
@@ -30,6 +31,9 @@ export function createApp(store: Store, publisher: Publisher, origin: string, de
     c.header('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' https: data:; media-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'");
     await next();
   });
+  // Compress UI text and JSON only; image/video ranges and binary uploads stay streaming.
+  app.use('*', compress({ encoding: 'gzip', threshold: 1024,
+    contentTypeFilter: /^(text\/(html|css|javascript)|application\/(javascript|json))/ }));
   const jsonLimit = bodyLimit({ maxSize: 3_000_000 });
   app.use('/api/*', (c,next) => c.req.path.startsWith('/api/uploads/') ? next() : jsonLimit(c,next));
   app.onError((error, c) => {

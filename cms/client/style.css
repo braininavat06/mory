@@ -253,3 +253,22 @@ html:has(.editor-assist-dialog[open]) { scrollbar-gutter: stable; }
  .editor-assist-dialog .assist-form-actions { bottom: -20px; }
  .markdown-editor-status { padding-inline: 4px; }
 }
+@media(max-width:600px){
+ .cms-header{padding:10px 12px;gap:8px}
+ .cms-header nav{grid-template-columns:repeat(4,minmax(0,1fr));gap:2px}
+ .cms-header nav button{min-width:0;min-height:44px;padding:6px;font-size:.875rem}
+ .cms-main{margin-top:16px;padding-inline:12px}.cms-main h1{font-size:1.5rem}
+ .filters{gap:8px;margin-block:14px}.filters>*{min-width:0;max-width:100%}
+ .filters select{flex:1}.filters input,input,textarea,select{font-size:16px}
+ .section-heading{gap:8px;flex-wrap:wrap}.cms-list button{padding-block:14px}
+ .editor-toolbar{gap:8px;padding-block:10px;margin-bottom:16px}
+ .editor-toolbar p{margin:0;flex-basis:100%}
+ .editor label{gap:5px;margin-block:12px}.editor-afterword{padding-block:16px}
+ .registry-list{gap:12px;margin-block:16px}.registry-row{gap:8px;padding-block:12px}
+ .analytics-tabs{gap:4px;flex-wrap:wrap;margin-bottom:14px}
+ .analytics-tabs button{padding-inline:8px;min-height:44px}
+ .analytics-summary{gap:12px;padding-block:14px}.analytics h2{margin-top:24px}
+ .analytics-visitors button{padding-block:12px}.analytics-pagination{gap:8px;flex-wrap:wrap}
+ .notice{padding:10px 12px;margin-block:14px}
+ .cms-main,.cms-list strong,.cms-list span,.cms-list time,.registry-row>*{min-width:0;overflow-wrap:anywhere}
+}

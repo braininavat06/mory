@@ -59,7 +59,7 @@ function App() {
   const go = (menu: CmsMenu, draft?: string, replace = false) => navigation.current?.navigate({ menu, ...(draft ? { draft } : {}) }, replace);
   const refresh = useCallback(async () => { try { setState(await api<State>('/api/state')); setLoaded(true); } catch (e) { setError(String((e as Error).message)); } }, []);
   useEffect(() => { void refresh(); }, [refresh]);
-  useEffect(() => { if (!state.jobs.some(j => ['publishing', 'deploying'].includes(j.state))) return; const timer = setInterval(() => { void refresh(); }, 4000); return () => clearInterval(timer); }, [state.jobs.some(j => ['publishing', 'deploying'].includes(j.state)), refresh]);
+  useEffect(() => { if (!state.jobs.some(j => ['publishing', 'deploying'].includes(j.state))) return; const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 4000); const resume = () => { if (!document.hidden) void refresh(); }; document.addEventListener('visibilitychange', resume); return () => { clearInterval(timer); document.removeEventListener('visibilitychange', resume); }; }, [state.jobs.some(j => ['publishing', 'deploying'].includes(j.state)), refresh]);
   const needsSync = (job: PublishJob | undefined) => !!state.localSync?.pending && job?.commit_sha === state.localSync.publication_sha;
   const listingStatus = (d: Draft) => { const job = state.jobs.find(j => j.key === d.key); const base = d.kind === 'series' && !d.published ? '미게시' : d.status; const label = !job || ['complete', 'superseded'].includes(job.state) ? base : `${base} · ${jobLabel(job)}`; return label + (needsSync(job) ? ' · 로컬 저장소 동기화 필요' : ''); };
   useEffect(() => {
@@ -137,6 +137,7 @@ function Editor({ initial, state, refresh, back, navigateGuard }: { navigateGuar
     if (!job || !['publishing', 'deploying'].includes(job.state)) return;
     let live = true;
     const timer = setInterval(async () => {
+      if (document.hidden) return;
       try {
         const next = await api<PublishJob>(`/api/jobs/${job.id}`); if (!live) return;
         if (next.state !== 'publishing') {

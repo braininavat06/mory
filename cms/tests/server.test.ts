@@ -15,6 +15,7 @@ import { readContent, publicSeries } from '../../src/lib/content.ts';
 import { displayDate, publicationTime } from '../../src/lib/dates.ts';
 import { categoryReferences } from '../shared.ts';
 import type { Draft, Payload } from '../shared.ts';
+import { gunzipSync } from 'node:zlib';
 import { writeFixtureContent } from '../../tests/fixtures.ts';
 const source = resolve('.');
 const git = (cwd: string, args: string[]) => execFileSync('git', ['-c','user.name=Test','-c','user.email=test@example.invalid',...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -33,6 +34,21 @@ function setup() {
   return { temp, root, remote, store, publisher, deployed: (state: typeof deployment) => { deployment = state; }, cleanup: () => { store.close(); rmSync(temp, { recursive: true, force: true }); } };
 }
 const modify = (store: Store, draft: Draft, patch: Record<string, any>, body = draft.value.body) => store.save(draft.key, draft.revision, { data: { ...draft.value.data, ...patch }, body });
+test('CMS compression preserves JSON privacy and respects gzip quality zero', async () => {
+ const f=setup();
+ try {
+  const assets=join(f.root,'cms/dist/assets');mkdirSync(assets,{recursive:true});
+  const script='var fixture = 1;\n'.repeat(300);writeFileSync(join(assets,'fixture-abcdefgh.js'),script);
+  const origin='http://127.0.0.1:40009',app=createApp(f.store,f.publisher,origin);
+  const get=(encoding:string)=>app.request(origin+'/api/state',{headers:{host:'127.0.0.1:40009','Accept-Encoding':encoding}});
+  const plain=await get('gzip;q=0');assert.equal(plain.headers.get('Content-Encoding'),null);const data=await plain.json();
+  const compressed=await get('gzip');assert.equal(compressed.headers.get('Content-Encoding'),'gzip');assert.equal(compressed.headers.get('Cache-Control'),'no-store');
+  assert.deepEqual(JSON.parse(gunzipSync(Buffer.from(await compressed.arrayBuffer())).toString()),data);
+  const js=await app.request(origin+'/assets/fixture-abcdefgh.js',{headers:{host:'127.0.0.1:40009','Accept-Encoding':'gzip'}});
+  assert.equal(js.headers.get('Content-Encoding'),'gzip');assert.match(js.headers.get('Cache-Control')||'',/immutable/);
+  assert.equal(gunzipSync(Buffer.from(await js.arrayBuffer())).toString(),script);
+ } finally {f.cleanup();}
+});
 async function publish(f: ReturnType<typeof setup>, draft: Draft, action: 'publish' | 'archive' | 'restore' | 'delete' = 'publish') {
   const job = f.publisher.request(draft.key, draft.revision, action); await f.publisher.idle(); return f.store.job(job.id);
 }

@@ -1,0 +1,16 @@
+{
+  "id": "mory",
+  "name": "Mory",
+  "description": "개인 사이트 콘텐츠 관리",
+  "driver": "native",
+  "port": 40009,
+  "tailscaleService": "svc:mory",
+  "healthPath": "/api/health",
+  "controlScript": "server.sh",
+  "logs": [
+    "runtime/cms.log",
+    "runtime/automator.log"
+  ],
+  "app": "000_mory-server.app",
+  "healthHost": "mory.mau-hamal.ts.net"
+}
