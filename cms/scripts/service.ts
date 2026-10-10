@@ -76,7 +76,7 @@ async function start() {
     const buildLog = openSync(launcherLog, 'a');
     try { execFileSync('npm', ['run', 'cms:build'], { cwd: root, stdio: ['ignore', buildLog, buildLog] }); }
     finally { closeSync(buildLog); }
-    const child = spawn('/opt/homebrew/bin/python3', [join(root, '../ops/log_run.py'), '--log', log, '--cwd', root, '--', process.execPath, '--import', 'tsx', entry], { cwd: root, env: process.env, detached: true, stdio: 'ignore' });
+    const child = spawn('/opt/homebrew/bin/python3', [join(root, 'libexec/log_run.py'), '--log', log, '--cwd', root, '--', process.execPath, '--import', 'tsx', entry], { cwd: root, env: process.env, detached: true, stdio: 'ignore' });
     await new Promise<void>((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
     child.unref();
     for (let attempt = 0; attempt < 40; attempt++) {

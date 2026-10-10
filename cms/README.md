@@ -29,7 +29,7 @@ MORY_CMS_ORIGIN=https://mory.mau-hamal.ts.net
 open "$HOME/server/mory/000_mory-server.app"
 ```
 
-앱은 `automator-launcher.zsh` → `server.sh start`를 호출합니다. CMS assets를 빌드한 뒤 Node를 detached로 실행하므로 앱을 닫아도 서버는 유지됩니다. 이미 실행 중이면 재시작/중복 실행하지 않습니다. macOS XPC 부모 프로세스에서 app 경로를 찾지 않고 launcher 자신의 경로를 기준으로 동작합니다. workflow의 홈 경로는 실제 설치 위치 `~/server/mory`입니다.
+앱은 이 서비스의 `libexec/automator.py` → `server.sh start` → `cms/scripts/service.ts`를 호출합니다. `libexec/log_run.py`는 앱 실행 결과와 서버 로그를 회전 저장합니다. CMS assets를 빌드한 뒤 Node를 detached로 실행하므로 앱을 닫아도 서버는 유지됩니다. 이미 실행 중이면 재시작/중복 실행하지 않습니다. 루트 공통 도구나 별도 `automator-launcher.zsh`에 의존하지 않습니다. workflow의 홈 경로는 실제 설치 위치 `~/server/mory`입니다.
 
 ```sh
 ./server.sh status
@@ -43,10 +43,11 @@ open "$HOME/server/mory/000_mory-server.app"
 Automator “셸 스크립트 실행” 원문:
 
 ```sh
-exec "$HOME/server/mory/automator-launcher.zsh"
+set -euo pipefail
+exec /opt/homebrew/bin/python3 "$HOME/server/mory/libexec/automator.py" mory
 ```
 
-Node PATH는 launcher에서 준비합니다. LaunchAgent·로그인 항목·Tailscale Serve 설정은 자동으로 추가하거나 변경하지 않습니다. 실행 중 `/api/health`는 `{ "service": "mory-cms", "ok": true }`를 반환합니다.
+Node PATH는 `server.sh`에서 준비합니다. LaunchAgent·로그인 항목·Tailscale Serve 설정은 자동으로 추가하거나 변경하지 않습니다. 실행 중 `/api/health`는 `{ "service": "mory-cms", "ok": true }`를 반환합니다.
 
 **최초 설치 시 CMS/날짜/시리즈 변경을 사용자가 검토하고 main에 배포한 뒤 실제 게시를 시작하세요.** 게시 clone의 사이트 코드가 새 content contract를 지원하지 않으면 게시를 중단합니다. 구현 검증에서는 로컬 bare 저장소로만 push했고 실제 GitHub에는 게시하지 않았습니다.
 
@@ -69,7 +70,9 @@ runtime/                     전체 Git 제외, mode 0700
   cms.log / automator.log    운영 로그
   backups/YYYY-MM-DD.sqlite  consistent snapshots (mode 0600)
   publish-repo/              CMS 전용 clone
-server.sh / automator-launcher.zsh  서비스 운영 스크립트
+server.sh                    서비스 관리 진입점
+libexec/                     이 서비스 전용 앱 실행·로그 도구
+cms/scripts/service.ts       CMS 빌드·시작·상태·안전한 종료
 000_mory-server.app/          Automator 실행 앱
 cms/dist/                    생성 CMS bundle, Git 제외 / Pages 배포 제외
 ```

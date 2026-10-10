@@ -22,7 +22,7 @@
     "test:cms": "tsx --test cms/tests/*.test.ts",
     "analytics:check": "tsc -p analytics/tsconfig.json && tsc -p analytics/tsconfig.tests.json",
     "analytics:test": "tsx --test analytics/tests/*.test.ts",
-    "analytics:build": "wrangler deploy --config analytics/wrangler.jsonc --dry-run --outdir ../runtime/analytics-build",
+    "analytics:build": "wrangler deploy --config analytics/wrangler.jsonc --dry-run --outdir \"$PWD/runtime/analytics-build\"",
     "analytics:migrate:local": "wrangler d1 migrations apply mory-analytics --config analytics/wrangler.jsonc --local --persist-to runtime/analytics-local",
     "analytics:measure": "tsx analytics/scripts/measure.ts"
   },

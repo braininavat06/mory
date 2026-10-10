@@ -60,7 +60,7 @@
 				<dict>
 					<key>COMMAND_STRING</key>
 					<string>set -euo pipefail
-exec /opt/homebrew/bin/python3 "$HOME/server/ops/automator.py" mory
+exec /opt/homebrew/bin/python3 "$HOME/server/mory/libexec/automator.py" mory
 </string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>
